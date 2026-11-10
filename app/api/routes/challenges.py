@@ -269,3 +269,4 @@ def list_challenges(
         "cutoff_24h": cutoff.isoformat(),
         "challenges": result,
     }
+
