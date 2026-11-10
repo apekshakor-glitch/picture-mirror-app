@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.challenges import router as challenges_router
 from app.api.routes.health import router as health_router
 from app.api.routes.pictures import router as pictures_router
 from app.api.routes.players import router as players_router
@@ -97,6 +98,7 @@ def create_application() -> FastAPI:
 
     # Register API routers
     app.include_router(health_router)
+    app.include_router(challenges_router)
     app.include_router(pictures_router)
     app.include_router(auth_router)
     app.include_router(players_router)

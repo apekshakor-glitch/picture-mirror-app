@@ -143,6 +143,10 @@
       return new Response(blob, initResp);
     };
 
+    if (url.startsWith("/api/challenges")) {
+      return createJsonResponse({ reused: false, message: "Offline mode: generate new image." });
+    }
+
     // 1. /api/key
     if (url === "/api/key") {
       if (method === "GET") {

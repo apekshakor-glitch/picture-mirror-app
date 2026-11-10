@@ -101,15 +101,46 @@ class S3Service:
             logger.error("Failed to generate presigned upload URL: %s", type(exc).__name__)
             raise
 
+    def upload_bytes(
+        self,
+        object_key: str,
+        data: bytes,
+        content_type: str = "image/png",
+    ) -> str:
+        """Upload raw binary image data directly to private S3 bucket."""
+        try:
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+                Body=data,
+                ContentType=content_type,
+            )
+            logger.info("Successfully uploaded %d bytes to s3://%s/%s", len(data), self.bucket_name, object_key)
+            return object_key
+        except Exception as exc:
+            logger.error("Failed to upload bytes to s3://%s/%s: %s", self.bucket_name, object_key, exc)
+            raise
+
+    def get_object_bytes(self, object_key: str) -> Tuple[bytes, str]:
+        """Download raw binary image data and content-type from private S3 bucket."""
+        try:
+            response = self.client.get_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+            )
+            content_type = response.get("ContentType", "image/png")
+            data = response["Body"].read()
+            return data, content_type
+        except Exception as exc:
+            logger.error("Failed to read s3://%s/%s: %s", self.bucket_name, object_key, exc)
+            raise
+
     def generate_presigned_download_url(
         self,
         object_key: str,
-        expires_in: int = 3600,
+        expires_in: int = 86400,
     ) -> str:
-        """Generate a pre-signed download/view URL for an existing private S3 object.
-
-        PLACEHOLDER: Awaiting picture retrieval pipeline requirements.
-        """
+        """Generate a pre-signed download/view URL for an existing private S3 object."""
         try:
             return self.client.generate_presigned_url(
                 ClientMethod="get_object",
