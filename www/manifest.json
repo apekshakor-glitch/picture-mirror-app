@@ -1,0 +1,24 @@
+{
+  "name": "DaRI AI Arcade",
+  "short_name": "DaRI Arcade",
+  "description": "DaRI AI Arcade — AI challenge games with Picture Mirror, Emoji Charades, Code Mirror & Prompt Repair",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#16110a",
+  "theme_color": "#d89d3a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "img/dari-logo-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "img/dari-logo-full.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

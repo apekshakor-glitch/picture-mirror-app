@@ -1,0 +1,4 @@
+{
+  "client_id": "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com",
+  "_instructions": "Replace the client_id above with your OAuth 2.0 Client ID from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Client IDs > Web application)."
+}

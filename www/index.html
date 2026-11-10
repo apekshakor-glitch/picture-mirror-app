@@ -1,0 +1,1709 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16110a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>DaRI AI &mdash; Game Arcade</title>
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<!-- Google Identity Services for Google OAuth Sign-In -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand" id="brand-home">
+    <img src="img/dari-logo-icon.png" alt="DaRI AI" class="brand-logo">
+    <span class="brand-text">
+      <span class="brand-name">DaRI AI</span>
+      <span class="brand-tagline">Dreams are Real Intelligence</span>
+    </span>
+  </div>
+  <div class="topbar-actions">
+    <div id="identity-badge" class="identity-badge" hidden>
+      <span class="identity-badge-label">Logged in as</span>
+      <span id="identity-badge-name" class="identity-badge-name"></span>
+      <span id="identity-badge-role" class="identity-badge-role"></span>
+      <button id="btn-switch-player" class="link-btn" type="button">Switch user</button>
+    </div>
+    <button id="btn-change-key" class="link-btn" hidden>Change API key</button>
+  </div>
+</header>
+
+<datalist id="player-name-list"></datalist>
+
+<main id="app">
+
+  <!-- SETUP: ask for OpenAI API key, once -->
+  <section id="screen-setup" class="screen">
+    <div class="card narrow">
+      <h1>Welcome</h1>
+      <p class="muted">This arcade runs on your own machine and uses your OpenAI API key directly from your browser to generate and judge images. Your key is saved locally on this computer so you won't be asked again.</p>
+      <label for="input-api-key">OpenAI API key</label>
+      <input id="input-api-key" type="password" placeholder="sk-..." autocomplete="off">
+      <p class="hint">Get a key at platform.openai.com/api-keys. It's stored only in a file on this computer, never sent anywhere except OpenAI.</p>
+      <button id="btn-save-key" class="btn-primary">Save &amp; continue</button>
+      <p id="setup-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- AUTHENTICATION & LOGIN SCREEN: STRICTLY GOOGLE OAUTH -->
+  <section id="screen-identity" class="screen">
+    <div class="card auth-card google-only-card">
+      <div class="auth-header">
+        <img src="img/dari-logo-icon.png" alt="DaRI AI" class="auth-logo">
+        <h1 class="auth-title">DaRI AI Arcade</h1>
+        <p class="muted auth-subtitle">Sign in with your Google account to access solo arcade challenges, live tournaments, and player leaderboards.</p>
+      </div>
+
+      <!-- Google OAuth Sign In Box -->
+      <div class="google-auth-box">
+        <div id="google-gsi-container" class="gsi-container"></div>
+
+        <button id="btn-google-signin" class="btn-google btn-google-hero" type="button">
+          <svg class="google-icon" viewBox="0 0 24 24" width="22" height="22">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          <span class="btn-google-text">Sign in with Google</span>
+        </button>
+
+        <p class="google-auth-caption">
+          <span class="auth-lock-icon">🔒</span>
+          <span>Secured via Google OAuth 2.0. Any Google or Gmail account can sign in instantly.</span>
+        </p>
+
+        <div class="auth-config-row">
+          <button id="btn-toggle-oauth-config" class="link-btn-subtle" type="button">⚙️ Google OAuth Client ID Configuration</button>
+        </div>
+
+        <div id="oauth-config-drawer" class="oauth-config-drawer" hidden>
+          <p class="hint">You can set your Google Client ID in <strong>google-auth-config.json</strong>, or paste it here:</p>
+          <input id="input-oauth-client-id" type="text" placeholder="123456789-abc.apps.googleusercontent.com" autocomplete="off">
+          <button id="btn-save-oauth-client-id" class="btn-secondary" type="button">Save Client ID</button>
+          <p id="oauth-config-msg" class="hint" hidden></p>
+        </div>
+      </div>
+
+      <!-- Hidden legacy compatibility fields so external scripts won't break -->
+      <div style="display:none;" aria-hidden="true">
+        <input id="input-identity-search" type="text">
+        <button id="btn-identity-continue" type="button"></button>
+        <p id="identity-notice"></p>
+        <p id="identity-error"></p>
+        <div id="identity-takeover-block">
+          <button id="btn-identity-takeover" type="button"></button>
+        </div>
+        <input id="input-identity-new-name" type="text">
+        <div id="identity-role-picker">
+          <button type="button" class="level-btn active" data-role="participant"></button>
+          <button type="button" class="level-btn" data-role="admin"></button>
+        </div>
+        <button id="btn-identity-create" type="button"></button>
+        <p id="identity-create-error"></p>
+        <input id="input-login-email" type="text">
+        <button id="btn-login-submit" type="button"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODAL: First-Time Google OAuth Profile Setup -->
+  <div id="modal-google-onboarding" class="auth-modal-backdrop" hidden>
+    <div class="auth-modal-card">
+      <div class="auth-modal-header">
+        <span class="google-badge-pill">Google Sign-In</span>
+        <h2>Welcome to DaRI AI Arcade!</h2>
+        <p class="muted">You're signing in with Google for the first time. Confirm your role to complete setup:</p>
+      </div>
+
+      <div class="google-user-summary">
+        <div id="google-avatar-display" class="google-avatar-img">G</div>
+        <div class="google-user-details">
+          <div id="google-onboard-name" class="google-user-name">User Name</div>
+          <div class="google-verified-tag">
+            <span>✓ Verified Google Account:</span>
+            <span id="google-onboard-email">user@gmail.com</span>
+          </div>
+        </div>
+      </div>
+
+      <label>Select Your DaRI Role</label>
+      <div class="level-picker" id="google-role-picker">
+        <button type="button" class="level-btn active" data-role="participant">
+          <span class="level-num">Dari Participant</span>
+          <span class="level-tag">Play solo challenges &amp; join tournaments</span>
+        </button>
+        <button type="button" class="level-btn" data-role="admin">
+          <span class="level-num">Dari Admin</span>
+          <span class="level-tag">Can also host &amp; manage tournaments</span>
+        </button>
+      </div>
+
+      <button id="btn-google-complete-signup" class="btn-primary btn-block" type="button">Confirm &amp; Enter Arcade</button>
+      <p id="google-onboard-error" class="error" hidden></p>
+    </div>
+  </div>
+
+  <!-- MODAL: Google OAuth Account Chooser (Interactive Simulator & Standalone Fallback) -->
+  <div id="modal-google-simulator" class="auth-modal-backdrop" hidden>
+    <div class="auth-modal-card google-chooser-card">
+      <div class="google-chooser-top">
+        <svg class="google-icon" viewBox="0 0 24 24" width="28" height="28">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <h3>Sign in with Google</h3>
+        <p class="muted">Enter your Google or institutional account to continue to <strong>DaRI AI Arcade</strong></p>
+      </div>
+
+      <div class="google-custom-acc-section">
+        <label for="input-google-sim-email">Google Email Address:</label>
+        <input id="input-google-sim-email" type="email" placeholder="e.g. 23pw17@psgtech.ac.in or name@gmail.com" autocomplete="email" autofocus>
+        <button id="btn-google-sim-custom-signin" class="btn-primary btn-block" type="button">Sign In with Google</button>
+      </div>
+
+      <div class="google-chooser-footer">
+        <button id="btn-close-google-simulator" class="link-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="auth-toast-container" class="auth-toast-container"></div>
+
+  <!-- HOME SCREEN — Day 2 Requirement: Main screen users see when opening the app -->
+  <section id="screen-wings" class="screen">
+    <div class="hub-header">
+      <img src="img/dari-logo-full.png" alt="DaRI AI &mdash; Dreams are Real Intelligence" class="hub-logo-full">
+      <h1>DaRI AI</h1>
+      <p id="wings-welcome" class="hub-subtitle" hidden>Welcome back, <span id="wings-welcome-name" class="hub-subtitle-name"></span> <span id="wings-welcome-role" class="identity-badge-role"></span> &mdash; pick where you want to go.</p>
+      <p id="wings-subtitle-default" class="hub-subtitle muted">Welcome to DaRI AI &mdash; Your Gateway to Intelligent Arcade Gaming &amp; Vertical AI.</p>
+    </div>
+
+    <div class="game-grid">
+      <!-- 1. Gaming Arcade — Opens Picture Mirror Setup Screen & Arcade Hub -->
+      <div class="game-card" id="card-gaming-arcade">
+        <div class="game-card-art art-2" aria-hidden="true">
+          <span class="game-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><line x1="7" y1="11" x2="7" y2="15"></line><line x1="5" y1="13" x2="9" y2="13"></line><circle cx="16" cy="11" r="1" fill="currentColor" stroke="none"></circle><circle cx="18.5" cy="13.5" r="1" fill="currentColor" stroke="none"></circle></svg></span>
+        </div>
+        <h2>Gaming Arcade</h2>
+        <p>Step into the arcade! Challenge yourself with Picture Mirror, Emoji Charades, Code Mirror &amp; Prompt Repair.</p>
+        <button class="btn-primary" id="btn-enter-gaming-arcade">Open Picture Mirror &rarr;</button>
+      </div>
+
+      <!-- 2. Agent Marketplace — Displays "Coming Soon" -->
+      <div class="game-card" id="card-marketplace">
+        <div class="game-card-art" aria-hidden="true">
+          <span class="game-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l1.5-4h15L21 7"></path><path d="M3 7v3a2 2 0 0 0 4 0V7"></path><path d="M7 10a2 2 0 0 0 4 0V7"></path><path d="M11 10a2 2 0 0 0 4 0V7"></path><path d="M15 10a2 2 0 0 0 4 0V7"></path><path d="M4 10v10h16V10"></path></svg></span>
+        </div>
+        <span class="badge-coming-soon">Coming Soon</span>
+        <h2>Agent Marketplace</h2>
+        <p>Discover, test, and deploy specialized vertical AI agents crafted for healthcare, legal, finance, and engineering.</p>
+        <button class="btn-secondary" id="btn-open-marketplace">View preview</button>
+      </div>
+
+      <!-- 3. AI Learning — Displays "Coming Soon" -->
+      <div class="game-card" id="card-ai-learning">
+        <div class="game-card-art art-3" aria-hidden="true">
+          <span class="game-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8l10-4 10 4-10 4-10-4Z"></path><path d="M6 10.5V16c0 1.5 2.5 3 6 3s6-1.5 6-3v-5.5"></path><line x1="22" y1="8" x2="22" y2="14"></line></svg></span>
+        </div>
+        <span class="badge-coming-soon">Coming Soon</span>
+        <h2>AI Learning</h2>
+        <p>Interactive masterclasses, prompt engineering bootcamps, and personalized AI recruitment interview preparation.</p>
+        <button class="btn-secondary" id="btn-open-learning">View preview</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PICTURE MIRROR SETUP SCREEN — Day 3 Requirement -->
+  <section id="screen-picture-mirror-setup" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="wings">&larr; Back to Home</button>
+      <h1><span class="game-icon-badge gib-mirror"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="14" rx="2"></rect><circle cx="7" cy="9.5" r="1.6" fill="currentColor" stroke="none"></circle><path d="M3.5 16.5 L8.5 11 L12 14 L16.5 8.5 L16.5 16.5 Z" fill="currentColor" stroke="none" opacity="0.9"></path><path d="M19.5 3.5 L20.4 5.6 L22.5 6.5 L20.4 7.4 L19.5 9.5 L18.6 7.4 L16.5 6.5 L18.6 5.6 Z" fill="currentColor" stroke="none"></path></svg></span> Picture Mirror Setup</h1>
+      <p class="muted">Customize your gameplay parameters before starting. The AI will generate a hidden original image tailored to your selected theme, difficulty, and rendering speed.</p>
+
+      <!-- 1. Theme Selection (10 approved themes) -->
+      <div class="setup-section-title">
+        <span>1. Choose Theme (10 Approved Themes)</span>
+        <span class="setup-section-sub" id="selected-theme-label">Cyberpunk Metropolis</span>
+      </div>
+      <div class="themes-grid" id="theme-selector-grid">
+        <button type="button" class="theme-card-btn active" data-theme="cyberpunk">
+          <span class="theme-card-icon">🌆</span>
+          <span class="theme-card-name">Cyberpunk Metropolis</span>
+          <span class="theme-card-desc">Neon rain &amp; holograms</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="fantasy-forest">
+          <span class="theme-card-icon">🌲</span>
+          <span class="theme-card-name">Mystical Fantasy</span>
+          <span class="theme-card-desc">Bioluminescent flora</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="oceanic-abyss">
+          <span class="theme-card-icon">🌊</span>
+          <span class="theme-card-name">Oceanic Deep Abyss</span>
+          <span class="theme-card-desc">Corals &amp; sunken ruins</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="space-odyssey">
+          <span class="theme-card-icon">🚀</span>
+          <span class="theme-card-name">Cosmic Space</span>
+          <span class="theme-card-desc">Nebulae &amp; planets</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="cozy-cafe">
+          <span class="theme-card-icon">☕</span>
+          <span class="theme-card-name">Cozy Autumn Cafe</span>
+          <span class="theme-card-desc">Warm lattes &amp; books</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="steampunk-workshop">
+          <span class="theme-card-icon">⚙️</span>
+          <span class="theme-card-name">Steampunk Workshop</span>
+          <span class="theme-card-desc">Brass gears &amp; steam</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="surrealist-dream">
+          <span class="theme-card-icon">🎨</span>
+          <span class="theme-card-name">Surrealist Dream</span>
+          <span class="theme-card-desc">Melting clocks &amp; sky</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="mythological-temple">
+          <span class="theme-card-icon">🏛️</span>
+          <span class="theme-card-name">Mythological Temple</span>
+          <span class="theme-card-desc">Ancient marble ruins</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="anime-street">
+          <span class="theme-card-icon">🍜</span>
+          <span class="theme-card-name">Vibrant Anime</span>
+          <span class="theme-card-desc">Food stalls &amp; lanterns</span>
+        </button>
+        <button type="button" class="theme-card-btn" data-theme="retro-synthwave">
+          <span class="theme-card-icon">🏎️</span>
+          <span class="theme-card-name">Retro 80s Synthwave</span>
+          <span class="theme-card-desc">Neon grids &amp; sunsets</span>
+        </button>
+      </div>
+
+      <!-- 2. Difficulty Selection (3 approved levels) -->
+      <div class="setup-section-title">
+        <span>2. Choose Difficulty Level</span>
+        <span class="setup-section-sub">3 Approved Tiers</span>
+      </div>
+      <div class="level-picker" id="setup-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy &mdash; Novice</span>
+        </button>
+        <button type="button" class="level-btn" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium &mdash; Intermediate</span>
+        </button>
+        <button type="button" class="level-btn" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard &mdash; Master</span>
+        </button>
+      </div>
+      <p class="hint" id="setup-level-hint">Level 1: One simple subject with clear shapes and plain lighting. Easiest to match closely.</p>
+
+      <!-- 3. Generation Speed -->
+      <div class="setup-section-title">
+        <span>3. Generation Speed</span>
+        <span class="setup-section-sub">Optimized for Mobile</span>
+      </div>
+      <div class="speed-picker" id="setup-speed-picker">
+        <button type="button" class="speed-btn active" data-speed="fast">
+          <span class="speed-title">⚡ Fast Mode</span>
+          <span class="speed-tag">Standard rendering speed &mdash; lower latency, rapid generation</span>
+        </button>
+        <button type="button" class="speed-btn" data-speed="quality">
+          <span class="speed-title">💎 Quality Mode</span>
+          <span class="speed-tag">High-Definition (HD) &mdash; richer textures, maximum artistic detail</span>
+        </button>
+      </div>
+
+      <!-- Live summary bar -->
+      <div class="setup-summary-bar">
+        <div class="setup-summary-item">
+          <span class="setup-summary-label">Theme</span>
+          <span class="setup-summary-val" id="summary-theme-val">Cyberpunk Metropolis</span>
+        </div>
+        <div class="setup-summary-item">
+          <span class="setup-summary-label">Difficulty</span>
+          <span class="setup-summary-val" id="summary-diff-val">Level 1 (Easy)</span>
+        </div>
+        <div class="setup-summary-item">
+          <span class="setup-summary-label">Speed</span>
+          <span class="setup-summary-val" id="summary-speed-val">Fast (Standard)</span>
+        </div>
+      </div>
+
+      <!-- Start Game button -->
+      <button id="btn-start-game-configured" class="btn-primary" style="font-size: 1.1rem; padding: 16px;">
+        Start Game &rarr;
+      </button>
+
+      <div style="margin-top: 18px; text-align: center;">
+        <button id="btn-goto-arcade-hub" class="link-btn" type="button">Explore All Arcade Games &amp; Tournaments &rarr;</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENT MARKETPLACE — Dedicated Coming Soon Screen -->
+  <section id="screen-marketplace-coming-soon" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="wings">&larr; Back to Home</button>
+      
+      <div class="coming-soon-hero">
+        <span class="badge-coming-soon">Coming Soon &bull; Q2 2026</span>
+        <h1>DaRI AI &mdash; Agent Marketplace</h1>
+        <p class="muted">A curated repository of enterprise-grade, vertical-specific autonomous agents designed for seamless production integration.</p>
+      </div>
+
+      <div class="coming-soon-features-grid">
+        <div class="feature-box">
+          <span class="feature-box-icon">🩺</span>
+          <h3>Clinical Health Agent</h3>
+          <p>Extracts EHR insights, analyzes medical transcripts, and draft structured clinical notes adhering to HIPAA standards.</p>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">⚖️</span>
+          <h3>Legal Contract Auditor</h3>
+          <p>Scans complex master services agreements, flags indemnification liabilities, and compares redlines in seconds.</p>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">📈</span>
+          <h3>Quantitative FinOps Agent</h3>
+          <p>Connects to portfolio data feeds, conducts anomaly detection on transaction ledgers, and runs risk simulations.</p>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">🛠️</span>
+          <h3>DevSecOps Synthesizer</h3>
+          <p>Monitors deployment pipelines, triages vulnerability alerts, and automatically generates patch pull requests.</p>
+        </div>
+      </div>
+
+      <div class="card narrow" style="margin-top: 20px; text-align: center; background: var(--surface-2);">
+        <h3>Get Early Access</h3>
+        <p class="muted">Join over 1,500 forward-thinking teams testing our vertical agents.</p>
+        <button class="btn-primary" id="btn-notify-marketplace" type="button">Request Early Access Invite</button>
+        <p id="notify-marketplace-success" class="hint" style="color: var(--accent-2); margin-top: 8px;" hidden>Thanks! You're on the priority notification list.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI LEARNING — Dedicated Coming Soon Screen -->
+  <section id="screen-learning-coming-soon" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="wings">&larr; Back to Home</button>
+      
+      <div class="coming-soon-hero">
+        <span class="badge-coming-soon">Coming Soon &bull; Q2 2026</span>
+        <h1>DaRI AI &mdash; AI Learning &amp; Fluency</h1>
+        <p class="muted">Empower your entire workforce with certified AI fluency, prompt engineering mastery, and role-based simulation labs.</p>
+      </div>
+
+      <div class="coming-soon-features-grid">
+        <div class="feature-box">
+          <span class="feature-box-icon">🎯</span>
+          <h3>Prompt Engineering Lab</h3>
+          <p>Hands-on sandbox with real-time feedback, token optimization heuristics, and multi-model comparison matrix.</p>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">🤝</span>
+          <h3>AI Recruitment Interview Prep</h3>
+          <p>Live adaptive voice &amp; text mock interviews with an AI evaluator providing instant rubric-based performance scoring.</p>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">🧠</span>
+          <h3>Autonomous Agent Architecture</h3>
+          <p>Deep-dive curriculum covering memory patterns, tool calling, re-act frameworks, and human-in-the-loop design.</p>
+        </div>
+        <div class="feature-box">
+          <span class="feature-box-icon">📜</span>
+          <h3>Enterprise Fluency Certification</h3>
+          <p>Verifiable credentials for business leaders, analysts, and developers demonstrating applied AI proficiency.</p>
+        </div>
+      </div>
+
+      <div class="card narrow" style="margin-top: 20px; text-align: center; background: var(--surface-2);">
+        <h3>Join the Curriculum Waitlist</h3>
+        <p class="muted">Receive introductory syllabus modules and early webinar access.</p>
+        <button class="btn-primary" id="btn-notify-learning" type="button">Join Learning Waitlist</button>
+        <p id="notify-learning-success" class="hint" style="color: var(--accent-2); margin-top: 8px;" hidden>You're on the waitlist! We'll send early access syllabus materials soon.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HUB: game arcade home -->
+  <section id="screen-hub" class="screen">
+    <div class="hub-header hub-header-compact">
+      <div class="hub-header-links">
+        <button class="link-btn back-link" data-back="wings">&larr; Back to DaRI AI home</button>
+        <span class="hub-header-sep">&middot;</span>
+        <button id="btn-view-profiles" class="link-btn" type="button">Player profiles</button>
+      </div>
+      <h1><span class="game-icon-badge gib-arcade"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><line x1="7" y1="11" x2="7" y2="15"></line><line x1="5" y1="13" x2="9" y2="13"></line><circle cx="16" cy="11" r="1" fill="currentColor" stroke="none"></circle><circle cx="18.5" cy="13.5" r="1" fill="currentColor" stroke="none"></circle></svg></span> AI Game Arcade</h1>
+      <p class="muted">A small collection of games you play against AI models. Pick one to start.</p>
+    </div>
+    <div class="game-grid">
+      <div class="game-card" id="card-prompt-mirror">
+        <div class="game-card-art" aria-hidden="true">
+          <span class="game-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="14" rx="2"></rect><circle cx="7" cy="9.5" r="1.6" fill="currentColor" stroke="none"></circle><path d="M3.5 16.5 L8.5 11 L12 14 L16.5 8.5 L16.5 16.5 Z" fill="currentColor" stroke="none" opacity="0.9"></path><path d="M19.5 3.5 L20.4 5.6 L22.5 6.5 L20.4 7.4 L19.5 9.5 L18.6 7.4 L16.5 6.5 L18.6 5.6 Z" fill="currentColor" stroke="none"></path></svg></span>
+        </div>
+        <h2>Prompt Mirror</h2>
+        <p>Study a hidden AI-generated picture, then write a prompt to recreate it. An AI judge scores how close you got.</p>
+        <button class="btn-primary">Play</button>
+      </div>
+      <div class="game-card" id="card-emoji-charades">
+        <div class="game-card-art art-2" aria-hidden="true">
+          <span class="game-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H9l-4.5 4v-4H5a3 3 0 0 1-3-3Z"></path><circle cx="9" cy="10.3" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="15" cy="10.3" r="1.1" fill="currentColor" stroke="none"></circle><path d="M8.3 13.8c1 1.3 2.3 2 3.7 2s2.7-.7 3.7-2"></path></svg></span>
+        </div>
+        <h2>Emoji Charades</h2>
+        <p>AI invents a fresh movie, idiom, or phrase and translates it into emojis &mdash; the category is always shown up front. Scoring is instant, no images involved.</p>
+        <button class="btn-primary">Play</button>
+      </div>
+      <div class="game-card" id="card-code-mirror">
+        <div class="game-card-art art-3" aria-hidden="true">
+          <span class="game-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="1.8"></rect><path d="M6.5 8.3 L9.7 11 L6.5 13.7"></path><line x1="11.8" y1="13.7" x2="16.2" y2="13.7"></line><line x1="8" y1="20.5" x2="16" y2="20.5"></line></svg></span>
+        </div>
+        <h2>Code Mirror</h2>
+        <p>Study a hidden AI-written Python function, then write a prompt to recreate it. An AI code reviewer scores how close you got. Nothing is ever executed &mdash; it's judged by reading, not running.</p>
+        <button class="btn-primary">Play</button>
+      </div>
+      <div class="game-card" id="card-prompt-repair">
+        <div class="game-card-art art-5" aria-hidden="true">
+          <span class="game-card-icon"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg></span>
+        </div>
+        <h2>Prompt Repair Shop</h2>
+        <p>Fix a customer's badly written AI prompt so it actually meets their requirement. Test it against one real message &mdash; solve it in fewer attempts for a higher score.</p>
+        <button class="btn-primary">Play</button>
+      </div>
+    </div>
+    <p class="more-games-note muted">More games are on the way.</p>
+  </section>
+
+  <!-- RULES: explain Prompt Mirror before playing -->
+  <section id="screen-rules" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1><span class="game-icon-badge gib-mirror"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="14" rx="2"></rect><circle cx="7" cy="9.5" r="1.6" fill="currentColor" stroke="none"></circle><path d="M3.5 16.5 L8.5 11 L12 14 L16.5 8.5 L16.5 16.5 Z" fill="currentColor" stroke="none" opacity="0.9"></path><path d="M19.5 3.5 L20.4 5.6 L22.5 6.5 L20.4 7.4 L19.5 9.5 L18.6 7.4 L16.5 6.5 L18.6 5.6 Z" fill="currentColor" stroke="none"></path></svg></span> Prompt Mirror</h1>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <ol class="rules-list">
+          <li>We'll generate a picture with AI &mdash; but we keep the prompt that made it a secret.</li>
+          <li>Study the picture, then write your own prompt describing what you see.</li>
+          <li>We generate a new picture from <em>your</em> prompt.</li>
+          <li>An AI judge compares your picture to the original and scores how close you got, out of 100.</li>
+        </ol>
+        <p class="muted">Each round makes one call to write the hidden prompt, two image-generation calls, and one scoring call to OpenAI, which uses your API credits.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>An AI art judge compares your recreated picture to the hidden original across several dimensions: the exact subject (and how many of them), the color palette, the composition and framing, the art style and medium (photo vs. painting vs. cartoon, etc.), the setting and background, and small distinguishing details like lighting, texture, or accessories. It's deliberately strict and uses the full 0&ndash;100 scale, so scores in the 90s are reserved for near-perfect matches &mdash; even one clearly wrong detail (a different color, a missing prop) costs several points. It never judges how good your picture looks on its own, only how closely it matches the original.</p>
+      </details>
+
+      <label>Mode</label>
+      <div class="level-picker" id="mode-picker">
+        <button type="button" class="level-btn active" data-mode="solo">
+          <span class="level-num">Solo</span>
+          <span class="level-tag">Play alone</span>
+        </button>
+        <button type="button" class="level-btn" data-mode="tournament">
+          <span class="level-num">Tournament</span>
+          <span class="level-tag">2+ players</span>
+        </button>
+      </div>
+
+      <p id="tournament-admin-hint" class="hint" hidden>Only a Dari Admin can set up a tournament &mdash; ask an admin to create one, then come back here to join it.</p>
+
+      <label>Difficulty</label>
+      <div class="level-picker" id="level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint" id="level-hint">Level 1: one simple object, plain style. Easiest to match closely.</p>
+
+      <button id="btn-start-round" class="btn-primary">Start a round</button>
+    </div>
+  </section>
+
+  <!-- CHALLENGE: show the original image, take the guess prompt -->
+  <section id="screen-challenge" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Recreate this picture <span id="challenge-level-badge" class="level-badge"></span></h1>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Study the picture above closely, then describe it in the prompt box exactly as you see it &mdash; objects, colors, style, composition. Submitting generates a new picture from your words, and an AI judge scores how closely it matches the original, out of 100.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>An AI art judge compares your recreated picture to the hidden original across several dimensions: the exact subject (and how many of them), the color palette, the composition and framing, the art style and medium (photo vs. painting vs. cartoon, etc.), the setting and background, and small distinguishing details like lighting, texture, or accessories. It's deliberately strict and uses the full 0&ndash;100 scale, so scores in the 90s are reserved for near-perfect matches &mdash; even one clearly wrong detail (a different color, a missing prop) costs several points. It never judges how good your picture looks on its own, only how closely it matches the original.</p>
+      </details>
+
+      <div id="challenge-loading" class="loading-row" hidden>
+        <span class="spinner"></span>
+        <span id="challenge-loading-text">Generating your challenge image&hellip;</span>
+      </div>
+
+      <div id="challenge-image-wrap" class="image-wrap" hidden>
+        <img id="challenge-image" alt="Challenge picture to recreate">
+      </div>
+
+      <div id="challenge-form" hidden>
+        <label for="input-guess-prompt">Your prompt</label>
+        <div class="input-with-mic">
+          <textarea id="input-guess-prompt" rows="3" placeholder="Describe exactly what you see in the picture..." autocomplete="off"></textarea>
+          <button type="button" id="btn-mic-guess-prompt" class="mic-btn" title="Speak your prompt">🎤</button>
+        </div>
+        <button id="btn-submit-guess" class="btn-primary">Generate my picture &amp; score it</button>
+      </div>
+
+      <p id="challenge-error" class="error" hidden></p>
+      <button id="btn-retry-challenge" class="btn-secondary" type="button" hidden>Try again</button>
+    </div>
+  </section>
+
+  <!-- RESULT: side-by-side + score + streaming feedback -->
+  <section id="screen-result" class="screen">
+    <div class="card wide">
+      <h1>Results <span id="result-level-badge" class="level-badge"></span></h1>
+
+      <div id="result-loading" class="loading-row" hidden>
+        <span class="spinner"></span>
+        <span id="result-loading-text">Scoring&hellip;</span>
+      </div>
+
+      <div class="result-images">
+        <div class="result-image-col">
+          <h3>Original</h3>
+          <img id="result-original-image" alt="Original picture">
+        </div>
+        <div class="result-image-col">
+          <h3>Your recreation</h3>
+          <img id="result-generated-image" alt="Your recreated picture">
+        </div>
+      </div>
+
+      <div id="score-block" class="score-block" hidden>
+        <div class="score-number"><span id="score-value">0</span><span class="score-max">/100</span></div>
+        <div class="score-bar-track"><div id="score-bar-fill" class="score-bar-fill"></div></div>
+      </div>
+
+      <p id="result-feedback" class="feedback"></p>
+
+      <div id="result-guess-reveal" class="reveal-box" hidden>
+        <span class="reveal-label">Your prompt was:</span>
+        <span id="reveal-guess-text"></span>
+      </div>
+
+      <div id="result-reveal" class="reveal-box" hidden>
+        <span class="reveal-label">The hidden prompt was:</span>
+        <span id="reveal-prompt-text"></span>
+      </div>
+
+      <div class="reveal-box ideal-prompt-block">
+        <span class="reveal-label">What would AI have written?</span>
+        <p class="hint">See the detailed prompt an AI would write after looking at the original picture &mdash; a model answer to help you improve your own guesses next time. Optional &mdash; makes one extra call to OpenAI.</p>
+        <button id="btn-reveal-ideal-prompt" class="btn-secondary" type="button">Show AI's ideal prompt</button>
+        <div id="ideal-prompt-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Asking AI to describe the original picture&hellip;</span>
+        </div>
+        <p id="ideal-prompt-error" class="error" hidden></p>
+        <p id="ideal-prompt-text" class="ideal-prompt-text" hidden></p>
+      </div>
+
+      <div class="result-actions">
+        <button id="btn-play-again" class="btn-primary">Play another round</button>
+        <button id="btn-back-to-arcade" class="btn-secondary">Back to arcade</button>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- TOURNAMENT HUB: create a new tournament, or join one already running
+       on this WiFi by entering your player ID + the tournament's ID -->
+  <section id="screen-tournament-hub" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="rules">&larr; Back</button>
+      <h1>Prompt Mirror tournaments</h1>
+      <p class="muted">Create a new tournament, or join one that's already running on this WiFi and play your matches from your own device.</p>
+
+      <button id="btn-goto-create-tournament" class="btn-primary">+ Create a new tournament</button>
+      <p id="tournament-hub-admin-hint" class="hint" hidden>Only a Dari Admin can create a tournament &mdash; ask an admin, then join it below once it's set up.</p>
+
+      <div class="tournament-join-block">
+        <label>Open tournaments</label>
+        <div id="tournament-open-list" class="tournament-open-list"></div>
+        <p id="tournament-open-empty" class="hint" hidden>No tournaments yet &mdash; create one to get started.</p>
+
+        <p class="hint">Or join by tournament ID directly:</p>
+        <div class="join-by-code-row">
+          <input id="input-join-tournament-id" type="text" placeholder="Tournament ID" autocomplete="off">
+          <button id="btn-join-tournament-code" class="btn-secondary" type="button">Join</button>
+        </div>
+        <p id="tournament-join-error" class="error" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOURNAMENT SETUP: enter the players and name the tournament -->
+  <section id="screen-tournament-setup" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="tournament-hub">&larr; Back</button>
+      <h1>Create tournament</h1>
+      <p class="muted">Add every player, then generate the fixture. It's a random single-elimination knockout &mdash; if the player count isn't a power of two, some players randomly get a first-round bye. Each match plays through the difficulty levels you pick below, in order, and whoever's cumulative score is higher advances. Once created, every player joins and plays their own matches from their own device.</p>
+
+      <label for="input-tournament-name">Tournament name</label>
+      <input id="input-tournament-name" type="text" placeholder="e.g. Friday Showdown" autocomplete="off">
+
+      <p class="hint">Type a player's name, or their player ID if they have one (useful when two players share a name).</p>
+      <div id="tournament-player-list" class="player-list"></div>
+      <button id="btn-add-player" class="btn-secondary" type="button">+ Add player</button>
+
+      <label for="bulk-player-names">Or paste a list (one name per line)</label>
+      <textarea id="bulk-player-names" rows="4" placeholder="Alice&#10;Bob&#10;Charlie&#10;Dana"></textarea>
+      <button id="btn-bulk-add-players" class="btn-secondary" type="button">Add these players</button>
+
+      <label>Match format</label>
+      <div class="level-picker" id="tournament-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint">Tap a level to include or leave out that round &mdash; at least one must stay on. Each match is best-of-however-many you pick, played in that order (e.g. Easy only = 1 round; Easy + Medium = 2 rounds).</p>
+
+      <p id="tournament-setup-error" class="error" hidden></p>
+      <button id="btn-generate-bracket" class="btn-primary">Generate fixture</button>
+    </div>
+  </section>
+
+  <!-- TOURNAMENT BRACKET: a live dashboard of the fixture. Auto-refreshes
+       as players finish their matches from their own devices - matches
+       are played by joining (see the tournament hub), not from here. -->
+  <section id="screen-tournament-bracket" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1 id="tournament-fixture-name">Tournament fixture</h1>
+      <p class="muted">Tournament ID: <strong id="tournament-fixture-id"></strong> &mdash; share this (and each player's own player ID) so they can join and play their matches from their own device.</p>
+      <div id="bracket-champion-banner" class="champion-block" hidden></div>
+      <div id="bracket-view" class="bracket-view"></div>
+      <div class="result-actions">
+        <button id="btn-new-tournament-from-bracket" class="btn-secondary">New tournament</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOURNAMENT MATCH: plays one match's sub-rounds (Level 1, 2, 3) between two players -->
+  <section id="screen-tournament-match" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="tournament-bracket">&larr; Back to fixture</button>
+      <h1><span id="match-round-name"></span></h1>
+      <p class="muted" id="match-players-label"></p>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Both players see the same hidden picture each sub-round, on their own device. Type your prompt whenever you're ready &mdash; you don't have to wait for your opponent to go first. Once you've both submitted, each device generates and scores its own player's picture, so neither of you sits around waiting on the other's turn. Whoever scores higher that sub-round wins it &mdash; the match goes to whoever's total score is higher across every level picked, with a tiebreaker sub-round if it ends up tied.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>An AI art judge compares your recreated picture to the hidden original across several dimensions: the exact subject (and how many of them), the color palette, the composition and framing, the art style and medium (photo vs. painting vs. cartoon, etc.), the setting and background, and small distinguishing details like lighting, texture, or accessories. It's deliberately strict and uses the full 0&ndash;100 scale, so scores in the 90s are reserved for near-perfect matches &mdash; even one clearly wrong detail (a different color, a missing prop) costs several points. It never judges how good your picture looks on its own, only how closely it matches the original.</p>
+      </details>
+
+      <div class="match-tally" id="match-tally"></div>
+
+      <div id="match-subround-active">
+        <h3 class="sub-round-heading">Sub-round <span id="sub-round-num"></span><span id="sub-round-of-wrap"> of <span id="sub-round-total"></span></span> <span id="sub-round-level-badge" class="level-badge"></span></h3>
+
+        <div id="match-image-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Setting up this sub-round&hellip;</span>
+        </div>
+
+        <div id="match-image-wrap" class="image-wrap" hidden>
+          <img id="match-challenge-image" alt="Challenge picture to recreate">
+        </div>
+
+        <div class="player-status-list" id="match-player-status-list"></div>
+        <p id="match-waiting-note" class="hint" hidden></p>
+
+        <div id="match-prompt-form" hidden>
+          <label id="match-current-player-label">Your prompt</label>
+          <div class="input-with-mic">
+            <textarea id="input-match-prompt" rows="3" placeholder="Describe exactly what you see in the picture..." autocomplete="off"></textarea>
+            <button type="button" id="btn-mic-match-prompt" class="mic-btn" title="Speak your prompt">🎤</button>
+          </div>
+          <button id="btn-submit-match-prompt" class="btn-primary">Submit prompt</button>
+        </div>
+
+        <div id="match-processing" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span id="match-processing-text">Generating &amp; scoring&hellip;</span>
+        </div>
+
+        <p id="match-error" class="error" hidden></p>
+      </div>
+
+      <div id="match-subround-result" hidden>
+        <div id="match-subround-cards" class="tournament-result-grid"></div>
+        <div class="reveal-box">
+          <span class="reveal-label">The hidden prompt was:</span>
+          <span id="match-subround-prompt-text"></span>
+        </div>
+
+        <div class="reveal-box ideal-prompt-block">
+          <span class="reveal-label">What would AI have written?</span>
+          <p class="hint">See the detailed prompt an AI would write after looking at the original picture &mdash; a model answer to help you both improve. Optional &mdash; makes one extra call to OpenAI.</p>
+          <button id="btn-reveal-match-ideal-prompt" class="btn-secondary" type="button">Show AI's ideal prompt</button>
+          <div id="match-ideal-prompt-loading" class="loading-row" hidden>
+            <span class="spinner"></span>
+            <span>Asking AI to describe the original picture&hellip;</span>
+          </div>
+          <p id="match-ideal-prompt-error" class="error" hidden></p>
+          <p id="match-ideal-prompt-text" class="ideal-prompt-text" hidden></p>
+        </div>
+
+        <button id="btn-next-subround" class="btn-primary">Continue</button>
+      </div>
+
+      <div id="match-final-result" hidden>
+        <div id="match-winner-banner" class="champion-block"></div>
+        <div id="match-final-tally" class="standings-table"></div>
+        <button id="btn-finish-match" class="btn-primary">Back to fixture</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- EMOJI RULES -->
+  <section id="screen-emoji-rules" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1><span class="game-icon-badge gib-emoji"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H9l-4.5 4v-4H5a3 3 0 0 1-3-3Z"></path><circle cx="9" cy="10.3" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="15" cy="10.3" r="1.1" fill="currentColor" stroke="none"></circle><path d="M8.3 13.8c1 1.3 2.3 2 3.7 2s2.7-.7 3.7-2"></path></svg></span> Emoji Charades</h1>
+      <details class="howto">
+        <summary>How to play</summary>
+        <ol class="rules-list">
+          <li>AI invents a fresh hidden answer &mdash; a movie title, an idiom, or a common phrase &mdash; and translates it into a string of emojis.</li>
+          <li>The category (Movie, Idiom, or Phrase) is shown right alongside the emojis, so you always know what kind of answer to look for.</li>
+          <li>You study the emojis and type your best guess. Scoring is instant and local &mdash; no extra AI call, no images, just a close look at how well your guess matches.</li>
+        </ol>
+        <p class="muted">Each round makes one AI call to OpenAI (to invent the answer and translate it into emojis), which uses your API credits. A fresh answer is generated every round, so content doesn't repeat.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>Scoring is done locally, without any AI call. Your guess is compared to the hidden answer two ways: how many of its key words you got right (ignoring small words like "a" or "the"), and how close your spelling and phrasing are letter-for-letter. The two are blended &mdash; weighted a bit more toward key words &mdash; into a score out of 100. An exact match is always 100; a guess that shares no words or letters with the answer scores near 0.</p>
+      </details>
+
+      <label>Mode</label>
+      <div class="level-picker" id="emoji-mode-picker">
+        <button type="button" class="level-btn active" data-mode="solo">
+          <span class="level-num">Solo</span>
+          <span class="level-tag">Play alone</span>
+        </button>
+        <button type="button" class="level-btn" data-mode="tournament">
+          <span class="level-num">Tournament</span>
+          <span class="level-tag">2+ players</span>
+        </button>
+      </div>
+
+      <p id="emoji-tournament-admin-hint" class="hint" hidden>Only a Dari Admin can set up a tournament &mdash; ask an admin to create one, then come back here to join it.</p>
+
+      <label>Difficulty</label>
+      <div class="level-picker" id="emoji-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint" id="emoji-level-hint">Level 1: well-known, easy-to-guess movies, idioms, and phrases.</p>
+
+      <button id="btn-emoji-start-round" class="btn-primary">Start a round</button>
+    </div>
+  </section>
+
+  <!-- EMOJI CHALLENGE: show the emoji string, take the guess -->
+  <section id="screen-emoji-challenge" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Guess the answer <span id="emoji-challenge-level-badge" class="level-badge"></span></h1>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Read the emoji string above &mdash; the category badge next to it tells you whether you're guessing a movie, an idiom, or a phrase. Type your best guess below &mdash; you can reveal a clue if you get stuck. Scoring is instant and compares your guess directly to the hidden answer, out of 100.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>Scoring is done locally, without any AI call. Your guess is compared to the hidden answer two ways: how many of its key words you got right (ignoring small words like "a" or "the"), and how close your spelling and phrasing are letter-for-letter. The two are blended &mdash; weighted a bit more toward key words &mdash; into a score out of 100. An exact match is always 100; a guess that shares no words or letters with the answer scores near 0.</p>
+      </details>
+
+      <div id="emoji-challenge-loading" class="loading-row" hidden>
+        <span class="spinner"></span>
+        <span>Inventing this round's answer and translating it into emojis&hellip;</span>
+      </div>
+
+      <div id="emoji-challenge-display-wrap" class="emoji-display-wrap" hidden>
+        <div id="emoji-challenge-display" class="emoji-display"></div>
+      </div>
+
+      <div id="emoji-challenge-clue-wrap" class="clue-block" hidden>
+        <span id="emoji-challenge-category" class="level-badge category-badge"></span>
+        <button id="btn-emoji-challenge-clue-toggle" class="link-btn" type="button">Show a clue</button>
+        <p id="emoji-challenge-clue-text" class="hint" hidden></p>
+      </div>
+
+      <div id="emoji-challenge-form" hidden>
+        <label for="input-emoji-guess">Your guess</label>
+        <div class="input-with-mic">
+          <textarea id="input-emoji-guess" rows="2" placeholder="What movie, idiom, or phrase is this?" autocomplete="off"></textarea>
+          <button type="button" id="btn-mic-emoji-guess" class="mic-btn" title="Speak your guess">🎤</button>
+        </div>
+        <button id="btn-submit-emoji-guess" class="btn-primary">Submit &amp; score it</button>
+      </div>
+
+      <p id="emoji-challenge-error" class="error" hidden></p>
+      <button id="btn-retry-emoji-challenge" class="btn-secondary" type="button" hidden>Try again</button>
+    </div>
+  </section>
+
+  <!-- EMOJI RESULT -->
+  <section id="screen-emoji-result" class="screen">
+    <div class="card wide">
+      <h1>Results <span id="emoji-result-level-badge" class="level-badge"></span></h1>
+
+      <div class="emoji-display-wrap">
+        <div id="emoji-result-display" class="emoji-display"></div>
+      </div>
+
+      <div id="emoji-score-block" class="score-block">
+        <div class="score-number"><span id="emoji-score-value">0</span><span class="score-max">/100</span></div>
+        <div class="score-bar-track"><div id="emoji-score-bar-fill" class="score-bar-fill"></div></div>
+      </div>
+
+      <p id="emoji-result-feedback" class="feedback"></p>
+
+      <div class="reveal-box">
+        <span class="reveal-label">Your guess was:</span>
+        <span id="emoji-reveal-guess-text"></span>
+      </div>
+
+      <div class="reveal-box">
+        <span class="reveal-label">The hidden answer was:</span>
+        <span id="emoji-reveal-phrase-text"></span>
+      </div>
+
+      <div class="reveal-box" id="emoji-explanation-box" hidden>
+        <span class="reveal-label">How the emoji breaks down:</span>
+        <span id="emoji-explanation-text"></span>
+      </div>
+
+      <div class="reveal-box ideal-prompt-block">
+        <span class="reveal-label">What would AI have guessed?</span>
+        <p class="hint">See what an AI guesses from just the emoji string and category &mdash; the same information you had &mdash; to compare against your own guess. Optional &mdash; makes one extra call to OpenAI.</p>
+        <button id="btn-reveal-emoji-ai-guess" class="btn-secondary" type="button">Show AI's guess</button>
+        <div id="emoji-ai-guess-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Asking AI to guess from the emoji&hellip;</span>
+        </div>
+        <p id="emoji-ai-guess-error" class="error" hidden></p>
+        <p id="emoji-ai-guess-text" class="ideal-prompt-text" hidden></p>
+      </div>
+
+      <div class="result-actions">
+        <button id="btn-emoji-play-again" class="btn-primary">Play another round</button>
+        <button id="btn-emoji-back-to-arcade" class="btn-secondary">Back to arcade</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- EMOJI TOURNAMENT SETUP -->
+  <section id="screen-emoji-tournament-setup" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="emoji-rules">&larr; Back</button>
+      <h1>Tournament setup</h1>
+      <p class="muted">Add every player, then generate the fixture. It's a random single-elimination knockout &mdash; if the player count isn't a power of two, some players randomly get a first-round bye. Each match plays through the difficulty levels you pick below, in order, and whoever's cumulative score is higher advances.</p>
+      <p class="hint">Type a player's name, or their player ID if they have one (useful when two players share a name).</p>
+      <div id="emoji-tournament-player-list" class="player-list"></div>
+      <button id="btn-emoji-add-player" class="btn-secondary" type="button">+ Add player</button>
+
+      <label for="emoji-bulk-player-names">Or paste a list (one name per line)</label>
+      <textarea id="emoji-bulk-player-names" rows="4" placeholder="Alice&#10;Bob&#10;Charlie&#10;Dana"></textarea>
+      <button id="btn-emoji-bulk-add-players" class="btn-secondary" type="button">Add these players</button>
+
+      <label>Match format</label>
+      <div class="level-picker" id="emoji-tournament-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint">Tap a level to include or leave out that round &mdash; at least one must stay on. Each match is best-of-however-many you pick, played in that order.</p>
+
+      <p id="emoji-tournament-setup-error" class="error" hidden></p>
+      <button id="btn-emoji-generate-bracket" class="btn-primary">Generate fixture</button>
+    </div>
+  </section>
+
+  <!-- EMOJI TOURNAMENT BRACKET -->
+  <section id="screen-emoji-tournament-bracket" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Tournament fixture</h1>
+      <div id="emoji-bracket-champion-banner" class="champion-block" hidden></div>
+      <div id="emoji-bracket-view" class="bracket-view"></div>
+      <div class="result-actions">
+        <button id="btn-emoji-play-next-match" class="btn-primary">Play next match</button>
+        <button id="btn-emoji-new-tournament-from-bracket" class="btn-secondary">New tournament</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- EMOJI TOURNAMENT MATCH -->
+  <section id="screen-emoji-tournament-match" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="emoji-tournament-bracket">&larr; Back to fixture</button>
+      <h1><span id="emoji-match-round-name"></span></h1>
+      <p class="muted" id="emoji-match-players-label"></p>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Both players see the same emoji string each sub-round and guess independently. Whoever's guess scores higher wins that sub-round &mdash; the match goes to whoever's total score is higher across every level you picked, with a tiebreaker sub-round if it ends up tied.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>Scoring is done locally, without any AI call. Your guess is compared to the hidden answer two ways: how many of its key words you got right (ignoring small words like "a" or "the"), and how close your spelling and phrasing are letter-for-letter. The two are blended &mdash; weighted a bit more toward key words &mdash; into a score out of 100. An exact match is always 100; a guess that shares no words or letters with the answer scores near 0.</p>
+      </details>
+
+      <div class="match-tally" id="emoji-match-tally"></div>
+
+      <div id="emoji-match-subround-active">
+        <h3 class="sub-round-heading">Sub-round <span id="emoji-sub-round-num"></span><span id="emoji-sub-round-of-wrap"> of <span id="emoji-sub-round-total"></span></span> <span id="emoji-sub-round-level-badge" class="level-badge"></span></h3>
+
+        <div id="emoji-match-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Inventing this sub-round's answer and translating it into emojis&hellip;</span>
+        </div>
+
+        <div id="emoji-match-display-wrap" class="emoji-display-wrap" hidden>
+          <div id="emoji-match-display" class="emoji-display"></div>
+        </div>
+
+        <div id="emoji-match-clue-wrap" class="clue-block" hidden>
+          <span id="emoji-match-category" class="level-badge category-badge"></span>
+          <button id="btn-emoji-match-clue-toggle" class="link-btn" type="button">Show a clue</button>
+          <p id="emoji-match-clue-text" class="hint" hidden></p>
+        </div>
+
+        <div class="player-status-list" id="emoji-match-player-status-list"></div>
+
+        <div id="emoji-match-guess-form" hidden>
+          <label id="emoji-match-current-player-label">Player's guess</label>
+          <div class="input-with-mic">
+            <textarea id="input-emoji-match-guess" rows="2" placeholder="What movie, idiom, or phrase is this?" autocomplete="off"></textarea>
+            <button type="button" id="btn-mic-emoji-match-guess" class="mic-btn" title="Speak your guess">🎤</button>
+          </div>
+          <button id="btn-submit-emoji-match-guess" class="btn-primary">Submit guess</button>
+        </div>
+
+        <div id="emoji-match-processing" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Scoring&hellip;</span>
+        </div>
+
+        <p id="emoji-match-error" class="error" hidden></p>
+        <button id="btn-retry-emoji-subround" class="btn-secondary" type="button" hidden>Try again</button>
+      </div>
+
+      <div id="emoji-match-subround-result" hidden>
+        <div id="emoji-match-subround-cards" class="tournament-result-grid"></div>
+        <div class="reveal-box">
+          <span class="reveal-label">The hidden answer was:</span>
+          <span id="emoji-match-subround-phrase-text"></span>
+        </div>
+        <div class="reveal-box" id="emoji-match-explanation-box" hidden>
+          <span class="reveal-label">How the emoji breaks down:</span>
+          <span id="emoji-match-explanation-text"></span>
+        </div>
+
+        <div class="reveal-box ideal-prompt-block">
+          <span class="reveal-label">What would AI have guessed?</span>
+          <p class="hint">See what an AI guesses from just the emoji string and category &mdash; the same information you both had. Optional &mdash; makes one extra call to OpenAI.</p>
+          <button id="btn-reveal-emoji-match-ai-guess" class="btn-secondary" type="button">Show AI's guess</button>
+          <div id="emoji-match-ai-guess-loading" class="loading-row" hidden>
+            <span class="spinner"></span>
+            <span>Asking AI to guess from the emoji&hellip;</span>
+          </div>
+          <p id="emoji-match-ai-guess-error" class="error" hidden></p>
+          <p id="emoji-match-ai-guess-text" class="ideal-prompt-text" hidden></p>
+        </div>
+
+        <button id="btn-emoji-next-subround" class="btn-primary">Continue</button>
+      </div>
+
+      <div id="emoji-match-final-result" hidden>
+        <div id="emoji-match-winner-banner" class="champion-block"></div>
+        <div id="emoji-match-final-tally" class="standings-table"></div>
+        <button id="btn-emoji-finish-match" class="btn-primary">Back to fixture</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODE RULES -->
+  <section id="screen-code-rules" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1><span class="game-icon-badge gib-code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="1.8"></rect><path d="M6.5 8.3 L9.7 11 L6.5 13.7"></path><line x1="11.8" y1="13.7" x2="16.2" y2="13.7"></line><line x1="8" y1="20.5" x2="16" y2="20.5"></line></svg></span> Code Mirror</h1>
+      <details class="howto">
+        <summary>How to play</summary>
+        <ol class="rules-list">
+          <li>We'll ask AI to write a small Python function &mdash; but we keep the request that produced it a secret.</li>
+          <li>Study the function, then write your own prompt describing what you think it does.</li>
+          <li>We generate a new function from <em>your</em> prompt.</li>
+          <li>An AI code reviewer compares your function to the original and scores how closely it matches, out of 100. Nothing is ever run &mdash; it's judged by reading the code, like a human reviewer would.</li>
+        </ol>
+        <p class="muted">Each round makes two code-generation calls and one scoring call to OpenAI, which uses your API credits.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>An AI code reviewer reads your recreated function side-by-side with the hidden original &mdash; nothing is ever executed. It judges whether the two would behave the same way on typical and edge-case inputs (empty input, negatives, duplicates, and so on), whether they take a similar algorithmic approach, whether the function's signature and overall structure match, how robust each is (error handling, input validation), and how similar the readability and style are. It's strict: scores above 90 are reserved for functionally equivalent code, while a behavioral mismatch or a completely different approach to the problem scores below 20.</p>
+      </details>
+
+      <label>Mode</label>
+      <div class="level-picker" id="code-mode-picker">
+        <button type="button" class="level-btn active" data-mode="solo">
+          <span class="level-num">Solo</span>
+          <span class="level-tag">Play alone</span>
+        </button>
+        <button type="button" class="level-btn" data-mode="tournament">
+          <span class="level-num">Tournament</span>
+          <span class="level-tag">2+ players</span>
+        </button>
+      </div>
+
+      <p id="code-tournament-admin-hint" class="hint" hidden>Only a Dari Admin can set up a tournament &mdash; ask an admin to create one, then come back here to join it.</p>
+
+      <label>Difficulty</label>
+      <div class="level-picker" id="code-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint" id="code-level-hint">Level 1: one simple function. Easiest to match closely.</p>
+
+      <button id="btn-code-start-round" class="btn-primary">Start a round</button>
+    </div>
+  </section>
+
+  <!-- CODE CHALLENGE: show the original function, take the guess prompt -->
+  <section id="screen-code-challenge" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Recreate this function <span id="code-challenge-level-badge" class="level-badge"></span></h1>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Read the hidden Python function above and figure out what request would have produced it. Describe that request in the prompt box &mdash; it generates a new function from your words, and an AI reviewer scores how closely its behavior matches the original, out of 100. Nothing is ever run.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>An AI code reviewer reads your recreated function side-by-side with the hidden original &mdash; nothing is ever executed. It judges whether the two would behave the same way on typical and edge-case inputs (empty input, negatives, duplicates, and so on), whether they take a similar algorithmic approach, whether the function's signature and overall structure match, how robust each is (error handling, input validation), and how similar the readability and style are. It's strict: scores above 90 are reserved for functionally equivalent code, while a behavioral mismatch or a completely different approach to the problem scores below 20.</p>
+      </details>
+
+      <div id="code-challenge-loading" class="loading-row" hidden>
+        <span class="spinner"></span>
+        <span id="code-challenge-loading-text">Generating your challenge function&hellip;</span>
+      </div>
+
+      <div id="code-challenge-code-wrap" class="code-block-wrap" hidden>
+        <pre class="code-block"><code id="code-challenge-code"></code></pre>
+      </div>
+
+      <div id="code-challenge-form" hidden>
+        <label for="input-code-guess-prompt">Your prompt</label>
+        <div class="input-with-mic">
+          <textarea id="input-code-guess-prompt" rows="3" placeholder="Describe the function you think would produce this code..." autocomplete="off"></textarea>
+          <button type="button" id="btn-mic-code-guess-prompt" class="mic-btn" title="Speak your prompt">🎤</button>
+        </div>
+        <button id="btn-code-submit-guess" class="btn-primary">Generate my function &amp; score it</button>
+      </div>
+
+      <p id="code-challenge-error" class="error" hidden></p>
+      <button id="btn-code-retry-challenge" class="btn-secondary" type="button" hidden>Try again</button>
+    </div>
+  </section>
+
+  <!-- CODE RESULT: side-by-side + score + streaming feedback -->
+  <section id="screen-code-result" class="screen">
+    <div class="card wide">
+      <h1>Results <span id="code-result-level-badge" class="level-badge"></span></h1>
+
+      <div id="code-result-loading" class="loading-row" hidden>
+        <span class="spinner"></span>
+        <span id="code-result-loading-text">Scoring&hellip;</span>
+      </div>
+
+      <div class="result-images">
+        <div class="result-image-col">
+          <h3>Original</h3>
+          <div class="code-block-wrap"><pre class="code-block"><code id="code-result-original-code"></code></pre></div>
+        </div>
+        <div class="result-image-col">
+          <h3>Your recreation</h3>
+          <div class="code-block-wrap"><pre class="code-block"><code id="code-result-generated-code"></code></pre></div>
+        </div>
+      </div>
+
+      <div id="code-score-block" class="score-block" hidden>
+        <div class="score-number"><span id="code-score-value">0</span><span class="score-max">/100</span></div>
+        <div class="score-bar-track"><div id="code-score-bar-fill" class="score-bar-fill"></div></div>
+      </div>
+
+      <p id="code-result-feedback" class="feedback"></p>
+
+      <div id="code-result-guess-reveal" class="reveal-box" hidden>
+        <span class="reveal-label">Your prompt was:</span>
+        <span id="code-reveal-guess-text"></span>
+      </div>
+
+      <div id="code-result-reveal" class="reveal-box" hidden>
+        <span class="reveal-label">The hidden request was:</span>
+        <span id="code-reveal-prompt-text"></span>
+      </div>
+
+      <div class="reveal-box ideal-prompt-block">
+        <span class="reveal-label">What would AI have written?</span>
+        <p class="hint">See the detailed prompt an AI would write after reading the hidden function &mdash; a model answer to help you improve your own guesses next time. Optional &mdash; makes one extra call to OpenAI.</p>
+        <button id="btn-reveal-code-ideal-prompt" class="btn-secondary" type="button">Show AI's ideal prompt</button>
+        <div id="code-ideal-prompt-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Asking AI to describe the hidden function&hellip;</span>
+        </div>
+        <p id="code-ideal-prompt-error" class="error" hidden></p>
+        <p id="code-ideal-prompt-text" class="ideal-prompt-text" hidden></p>
+      </div>
+
+      <div class="result-actions">
+        <button id="btn-code-play-again" class="btn-primary">Play another round</button>
+        <button id="btn-code-back-to-arcade" class="btn-secondary">Back to arcade</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODE TOURNAMENT SETUP: enter the players -->
+  <section id="screen-code-tournament-setup" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="code-rules">&larr; Back</button>
+      <h1>Tournament setup</h1>
+      <p class="muted">Add every player, then generate the fixture. It's a random single-elimination knockout &mdash; if the player count isn't a power of two, some players randomly get a first-round bye. Each match plays through the difficulty levels you pick below, in order, and whoever's cumulative score is higher advances.</p>
+      <p class="hint">Type a player's name, or their player ID if they have one (useful when two players share a name).</p>
+      <div id="code-tournament-player-list" class="player-list"></div>
+      <button id="btn-code-add-player" class="btn-secondary" type="button">+ Add player</button>
+
+      <label for="code-bulk-player-names">Or paste a list (one name per line)</label>
+      <textarea id="code-bulk-player-names" rows="4" placeholder="Alice&#10;Bob&#10;Charlie&#10;Dana"></textarea>
+      <button id="btn-code-bulk-add-players" class="btn-secondary" type="button">Add these players</button>
+
+      <label>Match format</label>
+      <div class="level-picker" id="code-tournament-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint">Tap a level to include or leave out that round &mdash; at least one must stay on. Each match is best-of-however-many you pick, played in that order.</p>
+
+      <p id="code-tournament-setup-error" class="error" hidden></p>
+      <button id="btn-code-generate-bracket" class="btn-primary">Generate fixture</button>
+    </div>
+  </section>
+
+  <!-- CODE TOURNAMENT BRACKET: the fixture, and entry point into each match -->
+  <section id="screen-code-tournament-bracket" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Tournament fixture</h1>
+      <div id="code-bracket-champion-banner" class="champion-block" hidden></div>
+      <div id="code-bracket-view" class="bracket-view"></div>
+      <div class="result-actions">
+        <button id="btn-code-play-next-match" class="btn-primary">Play next match</button>
+        <button id="btn-code-new-tournament-from-bracket" class="btn-secondary">New tournament</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CODE TOURNAMENT MATCH: plays one match's sub-rounds between two players -->
+  <section id="screen-code-tournament-match" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="code-tournament-bracket">&larr; Back to fixture</button>
+      <h1><span id="code-match-round-name"></span></h1>
+      <p class="muted" id="code-match-players-label"></p>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Both players see the same hidden function each sub-round and write their own prompt to recreate it. Whoever's function scores higher wins that sub-round &mdash; the match goes to whoever's total score is higher across every level you picked, with a tiebreaker sub-round if it ends up tied.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>An AI code reviewer reads your recreated function side-by-side with the hidden original &mdash; nothing is ever executed. It judges whether the two would behave the same way on typical and edge-case inputs (empty input, negatives, duplicates, and so on), whether they take a similar algorithmic approach, whether the function's signature and overall structure match, how robust each is (error handling, input validation), and how similar the readability and style are. It's strict: scores above 90 are reserved for functionally equivalent code, while a behavioral mismatch or a completely different approach to the problem scores below 20.</p>
+      </details>
+
+      <div class="match-tally" id="code-match-tally"></div>
+
+      <div id="code-match-subround-active">
+        <h3 class="sub-round-heading">Sub-round <span id="code-sub-round-num"></span><span id="code-sub-round-of-wrap"> of <span id="code-sub-round-total"></span></span> <span id="code-sub-round-level-badge" class="level-badge"></span></h3>
+
+        <div id="code-match-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Generating this sub-round's function&hellip;</span>
+        </div>
+
+        <div id="code-match-code-wrap" class="code-block-wrap" hidden>
+          <pre class="code-block"><code id="code-match-challenge-code"></code></pre>
+        </div>
+
+        <div class="player-status-list" id="code-match-player-status-list"></div>
+
+        <div id="code-match-prompt-form" hidden>
+          <label id="code-match-current-player-label">Player's prompt</label>
+          <div class="input-with-mic">
+            <textarea id="input-code-match-prompt" rows="3" placeholder="Describe the function you think would produce this code..." autocomplete="off"></textarea>
+            <button type="button" id="btn-mic-code-match-prompt" class="mic-btn" title="Speak your prompt">🎤</button>
+          </div>
+          <button id="btn-code-submit-match-prompt" class="btn-primary">Submit prompt</button>
+        </div>
+
+        <div id="code-match-processing" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span id="code-match-processing-text">Generating &amp; scoring&hellip;</span>
+        </div>
+
+        <p id="code-match-error" class="error" hidden></p>
+        <button id="btn-code-retry-subround" class="btn-secondary" type="button" hidden>Try again</button>
+      </div>
+
+      <div id="code-match-subround-result" hidden>
+        <div id="code-match-subround-cards" class="tournament-result-grid"></div>
+        <div class="reveal-box">
+          <span class="reveal-label">The hidden request was:</span>
+          <span id="code-match-subround-prompt-text"></span>
+        </div>
+
+        <div class="reveal-box ideal-prompt-block">
+          <span class="reveal-label">What would AI have written?</span>
+          <p class="hint">See the detailed prompt an AI would write after reading the hidden function &mdash; a model answer to help you both improve. Optional &mdash; makes one extra call to OpenAI.</p>
+          <button id="btn-reveal-code-match-ideal-prompt" class="btn-secondary" type="button">Show AI's ideal prompt</button>
+          <div id="code-match-ideal-prompt-loading" class="loading-row" hidden>
+            <span class="spinner"></span>
+            <span>Asking AI to describe the hidden function&hellip;</span>
+          </div>
+          <p id="code-match-ideal-prompt-error" class="error" hidden></p>
+          <p id="code-match-ideal-prompt-text" class="ideal-prompt-text" hidden></p>
+        </div>
+
+        <button id="btn-code-next-subround" class="btn-primary">Continue</button>
+      </div>
+
+      <div id="code-match-final-result" hidden>
+        <div id="code-match-winner-banner" class="champion-block"></div>
+        <div id="code-match-final-tally" class="standings-table"></div>
+        <button id="btn-code-finish-match" class="btn-primary">Back to fixture</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROMPT REPAIR RULES -->
+  <section id="screen-repair-rules" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1><span class="game-icon-badge gib-repair"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg></span> Prompt Repair Shop</h1>
+      <details class="howto">
+        <summary>How to play</summary>
+        <ol class="rules-list">
+          <li>A customer hands you a badly written AI prompt, a plain-English requirement it needs to meet, and the one real message it has to handle.</li>
+          <li>Edit the prompt, then click "Test repair" to run it against that message and see whether the result meets the requirement.</li>
+          <li>You get 3 attempts. Editing is free; only clicking "Test repair" uses one up &mdash; and a technical/API error never costs you an attempt.</li>
+          <li>Solve it faster for a higher score: 100 points on attempt 1, 75 on attempt 2, 50 on attempt 3. Hints are optional and cost 10 points each.</li>
+        </ol>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>Your edited prompt is run once against a real customer message, and the AI's response is checked against the ticket's requirement. Solving it on your first attempt scores 100, your second 75, your third 50 &mdash; not solving it within 3 attempts scores 0. Each hint you use subtracts 10 points from whatever you scored.</p>
+      </details>
+
+      <label>Mode</label>
+      <div class="level-picker" id="repair-mode-picker">
+        <button type="button" class="level-btn active" data-mode="solo">
+          <span class="level-num">Solo</span>
+          <span class="level-tag">Play alone</span>
+        </button>
+        <button type="button" class="level-btn" data-mode="tournament">
+          <span class="level-num">Tournament</span>
+          <span class="level-tag">2+ players</span>
+        </button>
+      </div>
+
+      <p id="repair-tournament-admin-hint" class="hint" hidden>Only a Dari Admin can set up a tournament &mdash; ask an admin to create one, then come back here to join it.</p>
+
+      <label>Difficulty</label>
+      <div class="level-picker" id="repair-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint" id="repair-level-hint">Level 1: extract one or two simple fields from a short message.</p>
+
+      <button id="btn-repair-start-round" class="btn-primary">Start a round</button>
+    </div>
+  </section>
+
+  <!-- PROMPT REPAIR CHALLENGE -->
+  <section id="screen-repair-challenge" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Repair this prompt <span id="repair-challenge-level-badge" class="level-badge"></span></h1>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Edit the broken prompt below so it satisfies the requirement listed above, then click "Test repair" to run it against the one real message shown. You get 3 attempts &mdash; editing is free, only testing uses one up, and a technical error never costs an attempt. Hints cost 10 points each. Solving it sooner scores higher.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>Your edited prompt is run once against the customer message shown, and the AI's response is checked against the requirement. Solving it on attempt 1 scores 100, attempt 2 scores 75, attempt 3 scores 50 &mdash; not solving it in 3 attempts scores 0. Each hint you use subtracts 10 points from whatever you scored.</p>
+      </details>
+
+      <div id="repair-loading" class="loading-row" hidden>
+        <span class="spinner"></span>
+        <span id="repair-loading-text">Testing your repair&hellip;</span>
+      </div>
+
+      <div id="repair-challenge-form-wrap" hidden>
+        <div id="repair-ticket-info"></div>
+
+        <label for="input-repair-prompt">The prompt (edit it)</label>
+        <div class="input-with-mic">
+          <textarea id="input-repair-prompt" rows="4" autocomplete="off"></textarea>
+          <button type="button" id="btn-mic-repair-prompt" class="mic-btn" title="Speak your prompt">🎤</button>
+        </div>
+
+        <div id="repair-attempts-badge" class="repair-attempts-badge">3 of 3 attempts left</div>
+        <div>
+          <button id="btn-repair-show-hint" class="link-btn" type="button">Show a hint</button>
+        </div>
+        <div id="repair-hints-revealed"></div>
+
+        <button id="btn-repair-test" class="btn-primary" type="button">Test repair</button>
+        <button id="btn-repair-finish" class="btn-secondary" type="button" hidden>Finish this ticket</button>
+
+        <div id="repair-results-wrap" hidden>
+          <h3>Latest attempt</h3>
+          <div id="repair-results-list"></div>
+        </div>
+      </div>
+
+      <p id="repair-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- PROMPT REPAIR RESULT -->
+  <section id="screen-repair-result" class="screen">
+    <div class="card wide">
+      <h1>Ticket closed</h1>
+
+      <div class="score-block">
+        <div class="score-number"><span id="repair-result-score">0</span><span class="score-max">/100</span></div>
+        <div class="score-bar-track"><div id="repair-result-score-fill" class="score-bar-fill"></div></div>
+      </div>
+
+      <div id="repair-result-repaired" class="reveal-box"></div>
+      <p id="repair-result-attempts-used" class="hint"></p>
+
+      <div class="reveal-box">
+        <span class="reveal-label">Skill practiced:</span>
+        <span id="repair-result-lesson"></span>
+      </div>
+
+      <div class="reveal-box ideal-prompt-block">
+        <span class="reveal-label">What would AI's repair have looked like?</span>
+        <p class="hint">See the prompt an AI would write to satisfy every requirement &mdash; a model answer to help you improve your own repairs next time. Optional &mdash; makes one extra call to OpenAI.</p>
+        <button id="btn-reveal-repair-ideal-prompt" class="btn-secondary" type="button">Show AI's ideal repair</button>
+        <div id="repair-ideal-prompt-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span>Asking AI to repair this prompt&hellip;</span>
+        </div>
+        <p id="repair-ideal-prompt-error" class="error" hidden></p>
+        <p id="repair-ideal-prompt-text" class="ideal-prompt-text" hidden></p>
+      </div>
+
+      <div class="result-actions">
+        <button id="btn-repair-play-again" class="btn-primary">Next customer</button>
+        <button id="btn-repair-back-to-arcade" class="btn-secondary">Back to arcade</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROMPT REPAIR TOURNAMENT SETUP -->
+  <section id="screen-repair-tournament-setup" class="screen">
+    <div class="card narrow">
+      <button class="link-btn back-link" data-back="repair-rules">&larr; Back</button>
+      <h1>Tournament setup</h1>
+      <p class="muted">Add every player, then generate the fixture. It's a random single-elimination knockout &mdash; if the player count isn't a power of two, some players randomly get a first-round bye. Each match plays through the difficulty levels you pick below, in order; both players repair the SAME ticket with their own private 3 attempts, and whoever's cumulative score is higher advances.</p>
+      <p class="hint">Type a player's name, or their player ID if they have one (useful when two players share a name).</p>
+      <div id="repair-tournament-player-list" class="player-list"></div>
+      <button id="btn-repair-add-player" class="btn-secondary" type="button">+ Add player</button>
+
+      <label for="repair-bulk-player-names">Or paste a list (one name per line)</label>
+      <textarea id="repair-bulk-player-names" rows="4" placeholder="Alice&#10;Bob&#10;Charlie&#10;Dana"></textarea>
+      <button id="btn-repair-bulk-add-players" class="btn-secondary" type="button">Add these players</button>
+
+      <label>Match format</label>
+      <div class="level-picker" id="repair-tournament-level-picker">
+        <button type="button" class="level-btn active" data-level="1">
+          <span class="level-num">Level 1</span>
+          <span class="level-tag">Easy</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="2">
+          <span class="level-num">Level 2</span>
+          <span class="level-tag">Medium</span>
+        </button>
+        <button type="button" class="level-btn active" data-level="3">
+          <span class="level-num">Level 3</span>
+          <span class="level-tag">Hard</span>
+        </button>
+      </div>
+      <p class="hint">Tap a level to include or leave out that round &mdash; at least one must stay on. Each match is best-of-however-many you pick, played in that order.</p>
+
+      <p id="repair-tournament-setup-error" class="error" hidden></p>
+      <button id="btn-repair-generate-bracket" class="btn-primary">Generate fixture</button>
+    </div>
+  </section>
+
+  <!-- PROMPT REPAIR TOURNAMENT BRACKET -->
+  <section id="screen-repair-tournament-bracket" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Tournament fixture</h1>
+      <div id="repair-bracket-champion-banner" class="champion-block" hidden></div>
+      <div id="repair-bracket-view" class="bracket-view"></div>
+      <div class="result-actions">
+        <button id="btn-repair-play-next-match" class="btn-primary">Play next match</button>
+        <button id="btn-repair-new-tournament-from-bracket" class="btn-secondary">New tournament</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROMPT REPAIR TOURNAMENT MATCH -->
+  <section id="screen-repair-tournament-match" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="repair-tournament-bracket">&larr; Back to fixture</button>
+      <h1><span id="repair-match-round-name"></span></h1>
+      <p class="muted" id="repair-match-players-label"></p>
+
+      <details class="howto">
+        <summary>How to play</summary>
+        <p>Both players repair the same ticket with their own private 3 attempts and hints. Once both are done, whoever scored higher wins that sub-round &mdash; the match goes to whoever's total score is higher across every level you picked, with a tiebreaker sub-round if it ends up tied.</p>
+      </details>
+
+      <details class="howto">
+        <summary>How it's judged</summary>
+        <p>Each player's edited prompt is run once against the customer message shown, and the AI's response is checked against the requirement. Solving it on attempt 1 scores 100, attempt 2 scores 75, attempt 3 scores 50 &mdash; not solving it in 3 attempts scores 0. Each hint used subtracts 10 points from whatever that player scored.</p>
+      </details>
+
+      <div class="match-tally" id="repair-match-tally"></div>
+
+      <div id="repair-match-turn-active">
+        <h3 class="sub-round-heading">Sub-round <span id="repair-sub-round-num"></span><span id="repair-sub-round-of-wrap"> of <span id="repair-sub-round-total"></span></span> <span id="repair-sub-round-level-badge" class="level-badge"></span></h3>
+        <p class="muted" id="repair-match-turn-label"></p>
+
+        <div class="player-status-list" id="repair-match-player-status-list"></div>
+
+        <div id="repair-match-loading" class="loading-row" hidden>
+          <span class="spinner"></span>
+          <span id="repair-match-loading-text">Testing this repair&hellip;</span>
+        </div>
+
+        <div id="repair-match-form-wrap" hidden>
+          <div id="repair-match-ticket-info"></div>
+
+          <label for="input-repair-match-prompt">The prompt (edit it)</label>
+          <div class="input-with-mic">
+            <textarea id="input-repair-match-prompt" rows="4" autocomplete="off"></textarea>
+            <button type="button" id="btn-mic-repair-match-prompt" class="mic-btn" title="Speak your prompt">🎤</button>
+          </div>
+
+          <div id="repair-match-attempts-badge" class="repair-attempts-badge">3 of 3 attempts left</div>
+          <div>
+            <button id="btn-repair-match-show-hint" class="link-btn" type="button">Show a hint</button>
+          </div>
+          <div id="repair-match-hints-revealed"></div>
+
+          <button id="btn-repair-match-test" class="btn-primary" type="button">Test repair</button>
+          <button id="btn-repair-match-done" class="btn-secondary" type="button" hidden>Done</button>
+
+          <div id="repair-match-results-wrap" hidden>
+            <h3>Latest attempt</h3>
+            <div id="repair-match-results-list"></div>
+          </div>
+        </div>
+
+        <p id="repair-match-error" class="error" hidden></p>
+      </div>
+
+      <div id="repair-match-subround-result" hidden>
+        <p class="muted">Ticket: <span id="repair-match-subround-ticket-title"></span></p>
+        <div id="repair-match-subround-cards" class="tournament-result-grid"></div>
+
+        <div class="reveal-box ideal-prompt-block">
+          <span class="reveal-label">What would AI's repair have looked like?</span>
+          <p class="hint">See the prompt an AI would write to satisfy every requirement &mdash; a model answer to help you both improve. Optional &mdash; makes one extra call to OpenAI.</p>
+          <button id="btn-reveal-repair-match-ideal-prompt" class="btn-secondary" type="button">Show AI's ideal repair</button>
+          <div id="repair-match-ideal-prompt-loading" class="loading-row" hidden>
+            <span class="spinner"></span>
+            <span>Asking AI to repair this prompt&hellip;</span>
+          </div>
+          <p id="repair-match-ideal-prompt-error" class="error" hidden></p>
+          <p id="repair-match-ideal-prompt-text" class="ideal-prompt-text" hidden></p>
+        </div>
+
+        <button id="btn-repair-next-subround" class="btn-primary">Continue</button>
+      </div>
+
+      <div id="repair-match-final-result" hidden>
+        <div id="repair-match-winner-banner" class="champion-block"></div>
+        <div id="repair-match-final-tally" class="standings-table"></div>
+        <button id="btn-repair-finish-match" class="btn-primary">Back to fixture</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLAYER PROFILES: persistent stats per player, saved on this computer -->
+  <section id="screen-player-profiles" class="screen">
+    <div class="card wide">
+      <button class="link-btn back-link" data-back="hub">&larr; Back to arcade</button>
+      <h1>Player profiles</h1>
+      <p class="muted">Stats are saved on this computer and tracked separately for solo play and tournaments, per game. Just typing your name works and will keep building the same profile &mdash; but if two players share a name, create a profile below and use the player ID it gives you instead.</p>
+
+      <div class="profile-create-block">
+        <label for="input-new-profile-name">Create a new player profile</label>
+        <div class="profile-create-row">
+          <input id="input-new-profile-name" type="text" placeholder="Player's name" autocomplete="off">
+          <button id="btn-create-profile" class="btn-primary" type="button">Generate player ID</button>
+        </div>
+        <p id="create-profile-error" class="error" hidden></p>
+        <div id="new-profile-result" class="reveal-box" hidden>
+          <span class="reveal-label">New player ID &mdash; use this instead of a name when playing:</span>
+          <div id="new-profile-id" class="new-profile-id"></div>
+          <span id="new-profile-name" class="muted"></span>
+        </div>
+      </div>
+
+      <div id="player-profiles-list" class="profile-grid"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Mobile Bottom Navigation Bar (Visible on mobile/tablet) -->
+<nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+  <button type="button" class="bottom-nav-item active" data-nav="wings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <span>Home</span>
+  </button>
+  <button type="button" class="bottom-nav-item" data-nav="picture-mirror-setup">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+    <span>Setup</span>
+  </button>
+  <button type="button" class="bottom-nav-item" data-nav="hub">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><line x1="7" y1="11" x2="7" y2="15"></line><line x1="5" y1="13" x2="9" y2="13"></line><circle cx="16" cy="11" r="1" fill="currentColor"></circle><circle cx="18.5" cy="13.5" r="1" fill="currentColor"></circle></svg>
+    <span>Arcade</span>
+  </button>
+  <button type="button" class="bottom-nav-item" data-nav="player-profiles">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    <span>Profiles</span>
+  </button>
+  <button type="button" class="bottom-nav-item" data-nav="setup">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    <span>Settings</span>
+  </button>
+</nav>
+
+<script src="mobile-adapter.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
