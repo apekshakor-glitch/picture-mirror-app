@@ -6,6 +6,7 @@
 
 ## Table of Contents
 
+0. [🚀 Intern Onboarding & Quickstart Guide](#-intern-onboarding--quickstart-guide)
 1. [Project Overview and Architecture](#1-project-overview-and-architecture)
 2. [Folder and File Structure](#2-folder-and-file-structure)
 3. [Required Software](#3-required-software)
@@ -22,6 +23,99 @@
 14. [Running Alembic Migrations Safely](#14-running-alembic-migrations-safely)
 15. [Production Deployment Roadmap (ECR & ECS Fargate)](#15-production-deployment-roadmap-ecr--ecs-fargate)
 16. [Implemented Features vs. Pending Placeholders](#16-implemented-features-vs-pending-placeholders)
+
+---
+
+---
+
+## 🚀 Intern Onboarding & Quickstart Guide
+
+Welcome to the **DaRI AI Picture Mirror** project! This guide walks you through setting up, running, and contributing to the application in minutes.
+
+### 🧩 What is This Project?
+This repository is a full-stack AI-powered arcade game and image processing platform:
+- **Backend**: Python 3.12 + FastAPI with asynchronous REST routes (`/api/players`, `/api/auth`, `/api/tournaments`, `/health`).
+- **Database**: PostgreSQL (AWS RDS) managed with SQLAlchemy 2.0 ORM and Alembic migrations.
+- **Frontend**: Vanilla JavaScript / HTML5 Arcade game located in `www/` (served directly by FastAPI at `/`).
+- **AI Engines**: Bespoke prompt generation supporting OpenAI DALL-E with automatic zero-config fallback to **Pollinations AI** and offline generative canvas.
+
+---
+
+### ⚡ Quickstart (Choose Your Path)
+
+#### Option 1: Run with Docker (Easiest & Fastest)
+If you have Docker Desktop installed, you can build and run everything in two commands:
+```bash
+# 1. Build the Docker image
+docker build -t picture-mirror-app .
+
+# 2. Run the container
+docker run -p 8000:8000 picture-mirror-app
+```
+Open **[http://localhost:8000](http://localhost:8000)** in your browser to play the game!
+
+---
+
+#### Option 2: Local Python Setup (For Backend & Full-Stack Developers)
+
+**Prerequisites:** Python 3.11+ installed (`python --version`).
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/apekshakor-glitch/picture-mirror-app.git
+   cd picture-mirror-app
+   ```
+
+2. **Create and activate a virtual environment:**
+   - **Windows (PowerShell):**
+     ```powershell
+     python -m venv .venv
+     .venv\Scripts\Activate.ps1
+     ```
+   - **macOS / Linux:**
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     ```
+
+3. **Install dependencies:**
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+4. **Set up your environment variables:**
+   Copy the template configuration:
+   ```bash
+   cp .env.example .env   # On Windows PowerShell: copy .env.example .env
+   ```
+   *(Optional)* If you run a local PostgreSQL instance, update `DATABASE_URL` or `DB_*` in `.env`.
+
+5. **Start the development server with live reload:**
+   ```bash
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+6. **Open in your browser:**
+   - **Arcade Web Game:** [http://localhost:8000/](http://localhost:8000/)
+   - **Interactive API Documentation (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
+   - **Alternative ReDoc UI:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+---
+
+#### Option 3: Frontend-Only Development (For UI / CSS / JS Designers)
+If you are only editing game UI, audio, or visual effects in `www/`:
+- Edit files directly in `www/` (`index.html`, `style.css`, `app.js`).
+- If the FastAPI backend is running, refresh `http://localhost:8000/` to see your changes immediately.
+- Alternatively, launch any static file server (e.g. VS Code **Live Server** extension, or `python -m http.server 8000 -d www`). The app automatically falls back to client-side storage if a live backend is unreachable!
+
+---
+
+### 🧪 Running Tests
+Verify your local environment and tests before pushing changes:
+```bash
+pytest -v
+```
 
 ---
 
