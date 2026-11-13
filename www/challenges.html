@@ -329,7 +329,8 @@ async function loadChallenges() {
       card.className = "card";
 
       const badgeClass = c.eligible_for_reuse ? "badge badge-reusable" : "badge badge-waiting";
-      const badgeText = c.eligible_for_reuse ? "✓ Ready to Reuse" : `${Math.max(0, 24 - c.hours_since_creation).toFixed(1)}h remaining`;
+      let remainingCooldown = 24 - (c.hours_since_last_used != null ? c.hours_since_last_used : c.hours_since_creation);
+      const badgeText = c.eligible_for_reuse ? "✓ Ready to Reuse" : `${Math.max(0.1, remainingCooldown).toFixed(1)}h cooldown`;
 
       const createdDate = new Date(c.created_at);
 
@@ -348,8 +349,12 @@ async function loadChallenges() {
               <span>${createdDate.toLocaleDateString()} ${createdDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
             </div>
             <div class="card-meta-row">
-              <span>Age:</span>
-              <span><strong>${c.hours_since_creation} hrs</strong></span>
+              <span>Saved:</span>
+              <span><strong>${c.hours_since_creation} hrs ago</strong></span>
+            </div>
+            <div class="card-meta-row">
+              <span>Last Used:</span>
+              <span><strong>${c.hours_since_last_used != null ? (c.hours_since_last_used + " hrs ago") : "Never"}</strong></span>
             </div>
             <div class="card-meta-row" style="margin-top: 4px;">
               <span>S3 Key:</span>
