@@ -4901,13 +4901,10 @@ async function runResultScreen() {
 
 
   try {
-
     await streamScore(state.originalImage, state.generatedImage);
-
   } catch (e) {
-
-    el("result-feedback").textContent = errorHint(e.message);
-
+    console.warn("[DaRI Arcade] streamScore uncaught:", e);
+    await fallbackSemanticScore(state.hiddenPrompt, state.guessPrompt, state.originalImage, state.generatedImage);
   } finally {
 
     el("result-loading").hidden = true;
@@ -4959,6 +4956,37 @@ function setScore(score) {
 
 // Built-in intelligent semantic judge: evaluates prompt recreation similarity
 // when no paid OpenAI API key is supplied or when the OpenAI API is unreachable.
+
+// Convert an image (kind: "url" or "b64") into a base64 Data URL so OpenAI Vision API
+// receives direct bytes and never attempts an external network download on relative or private URLs.
+async function ensureBase64DataUrl(img) {
+  if (!img) return "";
+  if (img.kind === "b64") {
+    const val = String(img.value || "").trim();
+    return val.startsWith("data:") ? val : ("data:image/png;base64," + val);
+  }
+  const rawUrl = String(img.value || "").trim();
+  if (!rawUrl) return "";
+  if (rawUrl.startsWith("data:")) return rawUrl;
+
+  try {
+    const fetchUrl = rawUrl.startsWith("http") ? rawUrl : (window.location.origin + rawUrl);
+    const resp = await fetch(fetchUrl);
+    if (resp.ok) {
+      const blob = await resp.blob();
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(rawUrl);
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch (err) {
+    console.warn("[DaRI Arcade] ensureBase64DataUrl fetch failed:", err);
+  }
+  return rawUrl;
+}
+
 async function fallbackSemanticScore(hiddenPrompt, guessPrompt, origImg, genImg) {
   const hidden = String(hiddenPrompt || "").trim();
   const guess = String(guessPrompt || "").trim();
@@ -5042,191 +5070,106 @@ async function streamScore(origImg, genImg) {
     return await fallbackSemanticScore(state.hiddenPrompt, state.guessPrompt, origImg, genImg);
   }
 
+  try {
+    const origDataUrl = await ensureBase64DataUrl(origImg);
+    const genDataUrl = await ensureBase64DataUrl(genImg);
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-
-    method: "POST",
-
-    headers: {
-
-      "Content-Type": "application/json",
-
-      "Authorization": "Bearer " + state.apiKey,
-
-    },
-
-    body: JSON.stringify({
-
-      model: SCORE_MODEL,
-
-      stream: true,
-
-      max_tokens: 300,
-
-      messages: [
-
-        { role: "system", content: SCORE_SYSTEM_PROMPT },
-
-        {
-
-          role: "user",
-
-          content: [
-
-            { type: "text", text: "Image 1 is the ORIGINAL. Image 2 is the RECREATION, generated from the player's guessed prompt. Compare them." },
-
-            { type: "image_url", image_url: { url: imgSrc(origImg) } },
-
-            { type: "image_url", image_url: { url: imgSrc(genImg) } },
-
-          ],
-
-        },
-
-      ],
-
-    }),
-
-  });
-
-
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + state.apiKey,
+      },
+      body: JSON.stringify({
+        model: SCORE_MODEL,
+        stream: true,
+        max_tokens: 300,
+        messages: [
+          { role: "system", content: SCORE_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Image 1 is the ORIGINAL. Image 2 is the RECREATION, generated from the player's guessed prompt. Compare them." },
+              { type: "image_url", image_url: { url: origDataUrl } },
+              { type: "image_url", image_url: { url: genDataUrl } },
+            ],
+          },
+        ],
+      }),
+    });
 
     if (!res.ok || !res.body) {
-    const errBody = await res.json().catch(() => ({}));
-    const errMsg = (errBody.error && errBody.error.message) || `OpenAI scoring request failed (${res.status})`;
-    console.warn("[DaRI Arcade] OpenAI score failed:", errMsg, "— falling back to built-in semantic judge");
-    return await fallbackSemanticScore(state.hiddenPrompt, state.guessPrompt, origImg, genImg);
-  }
-
-
-
-  const reader = res.body.getReader();
-
-  const decoder = new TextDecoder();
-
-  let buffer = "";
-
-  let fullText = "";
-
-  let scoreShown = false;
-
-  let feedbackStarted = false;
-
-  const feedbackEl = el("result-feedback");
-
-
-
-  while (true) {
-
-    const { done, value } = await reader.read();
-
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-
-    const lines = buffer.split("\n");
-
-    buffer = lines.pop();
-
-
-
-    for (const line of lines) {
-
-      const trimmed = line.trim();
-
-      if (!trimmed.startsWith("data:")) continue;
-
-      const payload = trimmed.slice(5).trim();
-
-      if (payload === "[DONE]") continue;
-
-      let json;
-
-      try {
-
-        json = JSON.parse(payload);
-
-      } catch (e) {
-
-        continue;
-
-      }
-
-      const delta = json.choices && json.choices[0] && json.choices[0].delta;
-
-      const piece = delta && delta.content;
-
-      if (!piece) continue;
-
-      fullText += piece;
-
-
-
-      if (!scoreShown) {
-
-        const match = fullText.match(/^\s*(\d{1,3})/);
-
-        const hasBreak = fullText.includes("\n\n") || fullText.includes("\n\r\n");
-
-        if (match && (hasBreak || fullText.trim().length > String(match[1]).length + 2)) {
-
-          setScore(parseInt(match[1], 10));
-
-          scoreShown = true;
-
-        }
-
-      }
-
-
-
-      if (scoreShown) {
-
-        const afterScore = fullText.replace(/^\s*\d{1,3}\s*\n+/, "");
-
-        if (afterScore.trim().length > 0) {
-
-          feedbackStarted = true;
-
-          feedbackEl.textContent = afterScore.trim();
-
-        }
-
-      }
-
+      const errBody = await res.json().catch(() => ({}));
+      const errMsg = (errBody.error && errBody.error.message) || `OpenAI scoring request failed (${res.status})`;
+      console.warn("[DaRI Arcade] OpenAI score failed:", errMsg, "— falling back to built-in semantic judge");
+      return await fallbackSemanticScore(state.hiddenPrompt, state.guessPrompt, origImg, genImg);
     }
 
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullText = "";
+    let scoreShown = false;
+    let feedbackStarted = false;
+    const feedbackEl = el("result-feedback");
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        let json;
+        try {
+          json = JSON.parse(payload);
+        } catch (e) {
+          continue;
+        }
+        const delta = json.choices && json.choices[0] && json.choices[0].delta;
+        const piece = delta && delta.content;
+        if (!piece) continue;
+        fullText += piece;
+
+        if (!scoreShown) {
+          const match = fullText.match(/^\s*(\d{1,3})/);
+          const hasBreak = fullText.includes("\n\n") || fullText.includes("\n\r\n");
+          if (match && (hasBreak || fullText.trim().length > String(match[1]).length + 2)) {
+            setScore(parseInt(match[1], 10));
+            scoreShown = true;
+          }
+        }
+
+        if (scoreShown) {
+          const afterScore = fullText.replace(/^\s*\d{1,3}\s*\n+/, "");
+          if (afterScore.trim().length > 0) {
+            feedbackStarted = true;
+            feedbackEl.textContent = afterScore.trim();
+          }
+        }
+      }
+    }
+
+    if (!scoreShown) {
+      const match = fullText.match(/^\s*(\d{1,3})/);
+      if (match) setScore(parseInt(match[1], 10));
+      else await fallbackSemanticScore(state.hiddenPrompt, state.guessPrompt, origImg, genImg);
+    }
+    if (!feedbackStarted && fullText.trim()) {
+      const afterScore = fullText.replace(/^\s*\d{1,3}\s*\n+/, "").trim();
+      feedbackEl.textContent = afterScore || fullText.trim();
+    }
+    return;
+  } catch (err) {
+    console.warn("[DaRI Arcade] streamScore exception:", err);
+    return await fallbackSemanticScore(state.hiddenPrompt, state.guessPrompt, origImg, genImg);
   }
-
-
-
-  if (!scoreShown) {
-
-    const match = fullText.match(/^\s*(\d{1,3})/);
-
-    if (match) setScore(parseInt(match[1], 10));
-
-  }
-
-  if (!feedbackStarted) {
-
-    const afterScore = fullText.replace(/^\s*\d{1,3}\s*\n+/, "").trim();
-
-    feedbackEl.textContent = afterScore || fullText.trim();
-
-  }
-
 }
-
-
-
-// ---------------------------------------------------------------------
-
-// Tournament mode
-
-// ---------------------------------------------------------------------
-
-
 
 function escapeHtml(s) {
 
@@ -5251,6 +5194,8 @@ async function scoreImagesOnce(origImg, genImg) {
     return await fallbackSemanticScore(state.hiddenPrompt, state.guessPrompt, origImg, genImg);
   }
   try {
+    const origDataUrl = await ensureBase64DataUrl(origImg);
+    const genDataUrl = await ensureBase64DataUrl(genImg);
 
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -5283,9 +5228,9 @@ async function scoreImagesOnce(origImg, genImg) {
 
             { type: "text", text: "Image 1 is the ORIGINAL. Image 2 is the RECREATION, generated from the player's guessed prompt. Compare them." },
 
-            { type: "image_url", image_url: { url: imgSrc(origImg) } },
+            { type: "image_url", image_url: { url: origDataUrl } },
 
-            { type: "image_url", image_url: { url: imgSrc(genImg) } },
+            { type: "image_url", image_url: { url: genDataUrl } },
 
           ],
 
@@ -5363,70 +5308,41 @@ async function generateIdealPrompt(img) {
     return state.hiddenPrompt || "A detailed visual representation matching the original scene.";
   }
 
+  try {
+    const dataUrl = await ensureBase64DataUrl(img);
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + state.apiKey,
+      },
+      body: JSON.stringify({
+        model: SCORE_MODEL,
+        max_tokens: 300,
+        messages: [
+          { role: "system", content: REVERSE_PROMPT_SYSTEM },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Write the ideal prompt that would recreate this exact picture." },
+              { type: "image_url", image_url: { url: dataUrl } },
+            ],
+          },
+        ],
+      }),
+    });
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-
-    method: "POST",
-
-    headers: {
-
-      "Content-Type": "application/json",
-
-      "Authorization": "Bearer " + state.apiKey,
-
-    },
-
-    body: JSON.stringify({
-
-      model: SCORE_MODEL,
-
-      max_tokens: 300,
-
-      messages: [
-
-        { role: "system", content: REVERSE_PROMPT_SYSTEM },
-
-        {
-
-          role: "user",
-
-          content: [
-
-            { type: "text", text: "Write the ideal prompt that would recreate this exact picture." },
-
-            { type: "image_url", image_url: { url: imgSrc(img) } },
-
-          ],
-
-        },
-
-      ],
-
-    }),
-
-  });
-
-  if (!res.ok) {
-
-    const errBody = await res.json().catch(() => ({}));
-
-    throw new Error((errBody.error && errBody.error.message) || `OpenAI request failed (${res.status})`);
-
+    if (res.ok) {
+      const data = await res.json();
+      const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+      if (text.trim()) return text.trim();
+    }
+  } catch (err) {
+    console.warn("[DaRI Arcade] generateIdealPrompt error:", err);
   }
 
-  const data = await res.json();
-
-  const content = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
-
-  const cleaned = content.trim();
-
-  if (!cleaned) throw new Error("OpenAI returned an empty prompt.");
-
-  return cleaned;
-
+  return state.hiddenPrompt || "A detailed visual representation matching the original scene.";
 }
-
-
 
 function addPlayerRow(name) {
 
