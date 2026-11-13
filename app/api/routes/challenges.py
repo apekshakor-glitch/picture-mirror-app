@@ -11,8 +11,10 @@ from datetime import datetime, timedelta, timezone
 import io
 import logging
 import random
+import struct
 import urllib.request
 import uuid
+import zlib
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -45,6 +47,36 @@ def _map_level_to_difficulty(level: int) -> str:
     return "hard"
 
 
+def _generate_fallback_png_bytes(prompt: str) -> bytes:
+    """Generate a clean procedural PNG image in pure Python when external image download fails."""
+    width, height = 512, 512
+    prompt_hash = sum(ord(c) for c in prompt) if prompt else 42
+    r_base = (prompt_hash * 37) % 180 + 30
+    g_base = (prompt_hash * 67) % 180 + 30
+    b_base = (prompt_hash * 97) % 180 + 30
+
+    lines = []
+    for y in range(height):
+        line = bytearray([0])  # filter byte 0 (None)
+        y_ratio = y / height
+        for x in range(width):
+            x_ratio = x / width
+            r = int((r_base * (1 - x_ratio) + 20 * x_ratio)) % 256
+            g = int((g_base * (1 - y_ratio) + 40 * y_ratio)) % 256
+            b = int((b_base * x_ratio + 60 * (1 - y_ratio))) % 256
+            line.extend([r, g, b])
+        lines.append(bytes(line))
+
+    raw_data = b"".join(lines)
+
+    def _chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    idat = zlib.compress(raw_data, level=6)
+
+    return b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", idat) + _chunk(b"IEND", b"")
+
 
 def _is_eligible_for_reuse(c: Challenge, cutoff: datetime) -> bool:
     """A challenge image is eligible for reuse ONLY IF:
@@ -66,6 +98,7 @@ def _is_eligible_for_reuse(c: Challenge, cutoff: datetime) -> bool:
             except Exception:
                 pass
     return True
+
 
 @router.get("/next")
 def get_next_challenge(
@@ -141,7 +174,7 @@ def get_next_challenge(
     # No images eligible (all saved images were used in the last 24 hours, or none exist)
     return {
         "reused": False,
-        "message": "No challenge images available that were unused in the last 24 hours. Generate new challenge image.",
+        "message": "No challenge images saved before 24 hours (or all used in last 24h). Generate new challenge image.",
     }
 
 
@@ -172,9 +205,11 @@ def upload_challenge_image(
         try:
             image_bytes = base64.b64decode(raw_b64)
         except Exception as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid base64 image data: {e}")
+            logger.warning("Invalid base64 payload for '%s': %s; generating procedural PNG", clean_prompt, e)
+            image_bytes = _generate_fallback_png_bytes(clean_prompt)
+            content_type = "image/png"
 
-    # Fetch from remote image URL (e.g. Pollinations AI, Unsplash)
+    # Fetch from remote image URL (e.g. Pollinations AI, Unsplash, Wikimedia)
     elif payload.image_url:
         target_url = payload.image_url.strip()
         try:
@@ -188,11 +223,14 @@ def upload_challenge_image(
                 if resp_content_type in ("image/png", "image/jpeg", "image/webp"):
                     content_type = resp_content_type
         except Exception as e:
-            logger.warning("Could not download image from URL %s: %s", target_url, e)
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch image from URL: {e}")
+            logger.warning("Could not download image from URL %s: %s; generating procedural PNG", target_url, e)
+            image_bytes = _generate_fallback_png_bytes(clean_prompt)
+            content_type = "image/png"
 
     if not image_bytes or len(image_bytes) < 100:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid image payload provided.")
+        logger.warning("No valid image bytes for '%s'; generating procedural PNG", clean_prompt)
+        image_bytes = _generate_fallback_png_bytes(clean_prompt)
+        content_type = "image/png"
 
     # Upload binary image to private S3 bucket
     challenge_id = uuid.uuid4()
