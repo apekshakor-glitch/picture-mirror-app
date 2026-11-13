@@ -62,22 +62,21 @@ def create_application() -> FastAPI:
     )
 
     # CORS Middleware configuration
-    # Restricts origins to configured domain list; does not default to open wildcard in production
-    if settings.CORS_ORIGINS:
+    cors_origins = [o.strip() for o in settings.CORS_ORIGINS if o.strip()] if settings.CORS_ORIGINS else []
+    if cors_origins:
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=settings.CORS_ORIGINS,
+            allow_origins=cors_origins,
             allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allow_headers=["*"],
         )
     else:
-        # Default local development fallback if no origins explicitly provided
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["http://localhost:3000", "http://localhost:8000"],
+            allow_origin_regex=r".*",
             allow_credentials=True,
-            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allow_headers=["*"],
         )
 
