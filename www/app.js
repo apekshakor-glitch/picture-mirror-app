@@ -4514,7 +4514,7 @@ async function startRound() {
 
   try {
 
-    const checkRes = await fetch(`/api/challenges/next?level=${state.level}`);
+    const checkRes = await fetch(`/api/challenges/next?level=${state.level}&theme=${encodeURIComponent(state.theme || "general")}`);
 
     if (checkRes.ok) {
 
@@ -4602,7 +4602,7 @@ async function generateChallengeImage() {
 
     // Asynchronously upload only the original challenge image to S3 (eligible for reuse after 24 hours)
 
-    uploadOriginalChallengeImageToS3(state.hiddenPrompt, img, state.level);
+    uploadOriginalChallengeImageToS3(state.hiddenPrompt, img, state.level, state.theme);
 
   } catch (e) {
 
@@ -4622,7 +4622,7 @@ async function generateChallengeImage() {
 
 
 
-async function uploadOriginalChallengeImageToS3(prompt, img, level) {
+async function uploadOriginalChallengeImageToS3(prompt, img, level, theme) {
   try {
     console.log("[DaRI Arcade] Uploading original challenge image to S3 (eligible for reuse after 24h)...");
 
@@ -4651,6 +4651,7 @@ async function uploadOriginalChallengeImageToS3(prompt, img, level) {
     const payload = {
       prompt: prompt,
       level: level || 1,
+      theme: (theme || state.theme || "general"),
       image_url: url,
       image_b64: b64,
     };

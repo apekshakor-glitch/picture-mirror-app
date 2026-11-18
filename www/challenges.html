@@ -33,6 +33,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
     padding: 16px 28px;
     border-bottom: 1px solid rgba(216,157,58,0.18);
     background: rgba(0,0,0,0.25);
@@ -66,13 +68,14 @@
   }
   .header-actions {
     display: flex;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
   }
   .btn {
     background: var(--surface-2);
     color: var(--text);
     border: 1px solid rgba(216,157,58,0.3);
-    padding: 8px 16px;
+    padding: 8px 14px;
     border-radius: 8px;
     font-size: 0.85rem;
     font-weight: 600;
@@ -83,15 +86,33 @@
     gap: 6px;
     transition: all 0.2s;
   }
-  .btn:hover {
+  .btn:hover:not(:disabled) {
     background: var(--accent);
     color: #120e09;
     border-color: var(--accent-bright);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .btn-primary {
     background: var(--accent);
     color: #120e09;
     border-color: var(--accent-bright);
+  }
+  .btn-danger {
+    background: rgba(255, 107, 107, 0.14);
+    color: #ff9b9b;
+    border: 1px solid rgba(255, 107, 107, 0.4);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--danger);
+    color: #1b0505;
+    border-color: #ff9b9b;
+  }
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 0.78rem;
   }
   main {
     max-width: 1200px;
@@ -102,7 +123,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
   }
   .stat-card {
     background: var(--surface);
@@ -123,13 +144,63 @@
     color: var(--accent-bright);
     margin-top: 4px;
   }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid rgba(216,157,58,0.18);
+    border-radius: var(--radius);
+  }
+  .toolbar-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .select-control {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid rgba(216,157,58,0.3);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .status-banner {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    display: none;
+  }
+  .status-banner.ok {
+    display: block;
+    background: rgba(51, 214, 166, 0.14);
+    border: 1px solid rgba(51, 214, 166, 0.4);
+    color: var(--accent-2);
+  }
+  .status-banner.err {
+    display: block;
+    background: rgba(255, 107, 107, 0.14);
+    border: 1px solid rgba(255, 107, 107, 0.4);
+    color: #ff9b9b;
+  }
   .section-title {
     font-size: 1.3rem;
     font-weight: 700;
     margin: 0 0 16px 0;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
   }
   .grid {
     display: grid;
@@ -176,6 +247,19 @@
     letter-spacing: 0.03em;
     text-transform: uppercase;
   }
+  .badge-theme {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(22, 17, 10, 0.85);
+    border: 1px solid rgba(240, 194, 106, 0.45);
+    color: var(--accent-bright);
+    text-transform: capitalize;
+  }
   .badge-reusable {
     background: rgba(51, 214, 166, 0.9);
     color: #072a20;
@@ -213,6 +297,13 @@
     display: flex;
     justify-content: space-between;
   }
+  .card-actions {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(216,157,58,0.1);
+    display: flex;
+    justify-content: flex-end;
+  }
   .mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.72rem;
@@ -244,7 +335,7 @@
     <img src="img/dari-logo-icon.png" alt="DaRI AI" class="brand-logo">
     <div class="brand-text">
       <h1>DaRI AI Challenge Vault</h1>
-      <p>S3 Stored Challenge Images & 24h Lifecycle</p>
+      <p>S3 Stored Challenge Images &amp; 24h Lifecycle</p>
     </div>
   </a>
   <div class="header-actions">
@@ -275,6 +366,26 @@
     </div>
   </div>
 
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <label for="filter-status" style="font-size: 0.82rem; color: var(--muted);">Filter:</label>
+      <select id="filter-status" class="select-control" onchange="renderGrid()">
+        <option value="all">All Statuses</option>
+        <option value="cooldown">24h Cooldown Only</option>
+        <option value="reusable">Ready to Reuse Only</option>
+      </select>
+      <select id="filter-theme" class="select-control" onchange="renderGrid()">
+        <option value="all">All Themes</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <button class="btn btn-danger" id="btn-clear-cooldown" onclick="bulkRemove('cooldown')">🧹 Remove 24h Cooldown Images</button>
+      <button class="btn btn-danger" id="btn-clear-all" onclick="bulkRemove('all')">🗑 Remove All Visible</button>
+    </div>
+  </div>
+
+  <div id="status-banner" class="status-banner"></div>
+
   <div class="section-title">
     <span>Stored Challenge Images</span>
     <span id="cutoff-info" style="font-size: 0.82rem; color: var(--muted); font-weight: normal;"></span>
@@ -289,6 +400,19 @@
 </main>
 
 <script>
+let allChallenges = [];
+
+function showBanner(msg, isError = false) {
+  const banner = document.getElementById("status-banner");
+  banner.textContent = msg;
+  banner.className = "status-banner " + (isError ? "err" : "ok");
+  setTimeout(() => {
+    if (banner.textContent === msg) {
+      banner.className = "status-banner";
+    }
+  }, 5000);
+}
+
 async function loadChallenges() {
   const loader = document.getElementById("loader");
   const grid = document.getElementById("grid");
@@ -298,13 +422,13 @@ async function loadChallenges() {
   empty.style.display = "none";
 
   try {
-    const res = await fetch("/api/challenges?limit=50");
+    const res = await fetch("/api/challenges?limit=200");
     if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.parse ? await res.parse() : await res.json();
+    const data = await res.json();
 
-    const challenges = data.challenges || [];
-    const total = challenges.length;
-    const reusable = challenges.filter(c => c.eligible_for_reuse).length;
+    allChallenges = data.challenges || [];
+    const total = allChallenges.length;
+    const reusable = allChallenges.filter(c => c.eligible_for_reuse).length;
     const waiting = total - reusable;
 
     document.getElementById("stat-total").textContent = total;
@@ -316,65 +440,142 @@ async function loadChallenges() {
       document.getElementById("cutoff-info").textContent = "24h Cutoff: " + cutoffDate.toLocaleString();
     }
 
-    loader.style.display = "none";
-
-    if (challenges.length === 0) {
-      empty.style.display = "block";
-      return;
+    // Populate theme dropdown while preserving current selection
+    const themeSelect = document.getElementById("filter-theme");
+    const prevTheme = themeSelect.value || "all";
+    const uniqueThemes = Array.from(new Set(allChallenges.map(c => (c.theme || "general").toLowerCase()))).sort();
+    themeSelect.innerHTML = `<option value="all">All Themes (${uniqueThemes.length})</option>` +
+      uniqueThemes.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+    if (uniqueThemes.includes(prevTheme)) {
+      themeSelect.value = prevTheme;
     }
 
-    grid.innerHTML = "";
-    challenges.forEach(c => {
-      const card = document.createElement("div");
-      card.className = "card";
-
-      const badgeClass = c.eligible_for_reuse ? "badge badge-reusable" : "badge badge-waiting";
-      let remainingCooldown = 24 - (c.hours_since_last_used != null ? c.hours_since_last_used : c.hours_since_creation);
-      const badgeText = c.eligible_for_reuse ? "✓ Ready to Reuse" : `${Math.max(0.1, remainingCooldown).toFixed(1)}h cooldown`;
-
-      const createdDate = new Date(c.created_at);
-
-      card.innerHTML = `
-        <div class="card-img-wrap">
-          <a href="${c.image_url}" target="_blank" title="Click to view full image in new tab">
-            <img class="card-img" src="${c.image_url}" alt="${c.title}" loading="lazy" onerror="this.src='img/dari-logo-icon.png'">
-          </a>
-          <span class="${badgeClass}">${badgeText}</span>
-        </div>
-        <div class="card-body">
-          <div class="card-prompt">"${escapeHtml(c.title)}"</div>
-          <div class="card-meta">
-            <div class="card-meta-row">
-              <span>Saved:</span>
-              <span>${createdDate.toLocaleDateString()} ${createdDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-            </div>
-            <div class="card-meta-row">
-              <span>Saved:</span>
-              <span><strong>${c.hours_since_creation} hrs ago</strong></span>
-            </div>
-            <div class="card-meta-row">
-              <span>Last Used:</span>
-              <span><strong>${c.hours_since_last_used != null ? (c.hours_since_last_used + " hrs ago") : "Never"}</strong></span>
-            </div>
-            <div class="card-meta-row" style="margin-top: 4px;">
-              <span>S3 Key:</span>
-            </div>
-            <div class="mono">${escapeHtml(c.s3_key)}</div>
-          </div>
-        </div>
-      `;
-      grid.appendChild(card);
-    });
-
-    grid.style.display = "grid";
+    loader.style.display = "none";
+    renderGrid();
   } catch (err) {
-    loader.innerHTML = `<span style="color: var(--danger)">Failed to load challenge vault: ${err.message}</span>`;
+    loader.innerHTML = `<span style="color: var(--danger)">Failed to load challenge vault: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+function renderGrid() {
+  const grid = document.getElementById("grid");
+  const empty = document.getElementById("empty-state");
+  const statusFilter = document.getElementById("filter-status").value;
+  const themeFilter = document.getElementById("filter-theme").value;
+
+  const filtered = allChallenges.filter(c => {
+    if (statusFilter === "cooldown" && c.eligible_for_reuse) return false;
+    if (statusFilter === "reusable" && !c.eligible_for_reuse) return false;
+    if (themeFilter !== "all" && (c.theme || "general").toLowerCase() !== themeFilter) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    grid.style.display = "none";
+    empty.style.display = "block";
+    return;
+  }
+
+  empty.style.display = "none";
+  grid.innerHTML = "";
+
+  filtered.forEach(c => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const badgeClass = c.eligible_for_reuse ? "badge badge-reusable" : "badge badge-waiting";
+    const remainingCooldown = 24 - (c.hours_since_last_used != null ? c.hours_since_last_used : c.hours_since_creation);
+    const badgeText = c.eligible_for_reuse ? "✓ Ready to Reuse" : `${Math.max(0.1, remainingCooldown).toFixed(1)}h cooldown`;
+    const themeLabel = c.theme || "general";
+    const createdDate = new Date(c.created_at);
+
+    card.innerHTML = `
+      <div class="card-img-wrap">
+        <a href="${c.image_url}" target="_blank" title="Click to view full image in new tab">
+          <img class="card-img" src="${c.image_url}" alt="${escapeHtml(c.title)}" loading="lazy" onerror="this.src='img/dari-logo-icon.png'">
+        </a>
+        <span class="badge-theme">${escapeHtml(themeLabel)}</span>
+        <span class="${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-prompt">"${escapeHtml(c.title)}"</div>
+        <div class="card-meta">
+          <div class="card-meta-row">
+            <span>Theme / Difficulty:</span>
+            <span><strong>${escapeHtml(themeLabel)}</strong> &middot; ${escapeHtml(c.difficulty || "easy")}</span>
+          </div>
+          <div class="card-meta-row">
+            <span>Saved:</span>
+            <span>${createdDate.toLocaleDateString()} ${createdDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} (${c.hours_since_creation}h ago)</span>
+          </div>
+          <div class="card-meta-row">
+            <span>Last Used:</span>
+            <span><strong>${c.hours_since_last_used != null ? (c.hours_since_last_used + " hrs ago") : "Never"}</strong></span>
+          </div>
+          <div class="card-meta-row" style="margin-top: 4px;">
+            <span>S3 Key:</span>
+          </div>
+          <div class="mono">${escapeHtml(c.s3_key)}</div>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-danger btn-sm" onclick="removeSingle('${c.id}', this)">🗑 Remove from Dataset</button>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  grid.style.display = "grid";
+}
+
+async function removeSingle(challengeId, btnEl) {
+  if (!confirm("Remove this challenge image from the S3 bucket and dataset?")) return;
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = "Removing...";
+  }
+  try {
+    const res = await fetch(`/api/challenges/${encodeURIComponent(challengeId)}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+    showBanner(`Removed image from dataset${data.deleted_from_s3 ? " and S3" : ""}.`);
+    await loadChallenges();
+  } catch (err) {
+    showBanner("Failed to remove image: " + err.message, true);
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.textContent = "🗑 Remove from Dataset";
+    }
+  }
+}
+
+async function bulkRemove(scope) {
+  const themeFilter = document.getElementById("filter-theme").value;
+  const themeParam = themeFilter !== "all" ? `&theme=${encodeURIComponent(themeFilter)}` : "";
+  const label = scope === "cooldown"
+    ? (themeFilter !== "all" ? `all 24h cooldown images in theme "${themeFilter}"` : "ALL images currently in 24h cooldown")
+    : (themeFilter !== "all" ? `ALL images in theme "${themeFilter}"` : "ALL stored challenge images");
+
+  if (!confirm(`Are you sure you want to remove ${label} from S3 and the dataset?`)) return;
+
+  const btn = document.getElementById(scope === "cooldown" ? "btn-clear-cooldown" : "btn-clear-all");
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/challenges?scope=${scope}${themeParam}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+    showBanner(data.message || `Removed ${data.deleted_count || 0} image(s).`);
+    await loadChallenges();
+  } catch (err) {
+    showBanner("Bulk remove failed: " + err.message, true);
+  } finally {
+    btn.disabled = false;
   }
 }
 
 function escapeHtml(str) {
   if (!str) return "";
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 document.addEventListener("DOMContentLoaded", loadChallenges);
@@ -382,4 +583,3 @@ document.addEventListener("DOMContentLoaded", loadChallenges);
 
 </body>
 </html>
-

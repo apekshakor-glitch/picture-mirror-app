@@ -15,11 +15,12 @@ import struct
 import urllib.request
 import uuid
 import zlib
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -103,21 +104,24 @@ def _is_eligible_for_reuse(c: Challenge, cutoff: datetime) -> bool:
 @router.get("/next")
 def get_next_challenge(
     level: int = Query(1, ge=1, le=5),
+    theme: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     s3_service: S3Service = Depends(get_s3_service),
 ) -> Dict[str, Any]:
     """Retrieve an existing challenge image from S3 if NOT used in the last 24 hours.
 
-    Enforces the 24-hour reuse rule:
+    Enforces the 24-hour reuse rule and theme matching:
     - Only images created > 24 hours ago AND not used in the last 24 hours can be reused.
-    - If all images were used within the last 24 hours (or none exist), returns reused: false
-      so the client generates a fresh challenge image.
+    - When a theme is specified, ONLY images matching that exact theme are eligible.
+    - If all matching images were used within the last 24 hours (or none exist), returns reused: false
+      so the client generates a fresh challenge image matching the selected theme.
     - When an image is reused, it is immediately marked with last_used_at = now to start
       its 24-hour cooldown.
     """
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=24)
     target_difficulty = _map_level_to_difficulty(level)
+    target_theme = theme.strip().lower() if theme and theme.strip() else None
 
     # 1. Fetch active challenges created at least 24 hours ago
     candidates = (
@@ -132,7 +136,14 @@ def get_next_challenge(
     # 2. Filter to challenges that have NOT been used in the last 24 hours
     eligible_candidates = [c for c in candidates if _is_eligible_for_reuse(c, cutoff)]
 
-    # 3. Prefer matching difficulty if available
+    # 3. Strictly filter by selected theme when provided so mismatched themes are never reused
+    if target_theme:
+        eligible_candidates = [
+            c for c in eligible_candidates
+            if (c.theme or "").strip().lower() == target_theme
+        ]
+
+    # 4. Prefer matching difficulty if available
     matching_diff = [c for c in eligible_candidates if c.difficulty == target_difficulty]
     selection_pool = matching_diff if matching_diff else eligible_candidates
 
@@ -245,10 +256,11 @@ def upload_challenge_image(
 
     # Record in database
     difficulty = _map_level_to_difficulty(payload.level)
+    normalized_theme = (payload.theme or "general").strip().lower() or "general"
     now = datetime.now(timezone.utc)
     challenge = Challenge(
         id=challenge_id,
-        theme=payload.theme or "general",
+        theme=normalized_theme,
         difficulty=difficulty,
         title=clean_prompt[:128],
         reference_image_s3_key=s3_key,
@@ -308,21 +320,137 @@ def get_challenge_image(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve image from S3.")
 
 
-@router.get("")
-def list_challenges(
-    limit: int = Query(20, ge=1, le=100),
+def _remove_challenge(
+    challenge: Challenge,
+    db: Session,
+    s3_service: S3Service,
+) -> Tuple[bool, str]:
+    """Delete a challenge image from S3 and remove or deactivate it in PostgreSQL."""
+    s3_deleted = False
+    if challenge.reference_image_s3_key:
+        s3_deleted = s3_service.delete_object(challenge.reference_image_s3_key)
+
+    try:
+        db.delete(challenge)
+        db.commit()
+        return s3_deleted, "hard"
+    except IntegrityError:
+        # Preserve historical round foreign keys while hiding the challenge from dataset & reuse
+        db.rollback()
+        challenge.is_active = False
+        challenge.updated_at = datetime.now(timezone.utc)
+        db.add(challenge)
+        db.commit()
+        return s3_deleted, "soft"
+
+
+@router.delete("/{challenge_id}")
+def delete_challenge(
+    challenge_id: uuid.UUID,
     db: Session = Depends(get_db),
+    s3_service: S3Service = Depends(get_s3_service),
 ) -> Dict[str, Any]:
-    """List stored challenges and their 24-hour reuse eligibility status."""
+    """Remove a specific challenge image from the dataset (S3 and database)."""
+    challenge = db.get(Challenge, challenge_id)
+    if not challenge or not challenge.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Challenge image not found.")
+
+    s3_key = challenge.reference_image_s3_key
+    s3_deleted, mode = _remove_challenge(challenge, db, s3_service)
+    logger.info("Removed challenge %s (%s) [mode=%s, s3_deleted=%s]", challenge_id, s3_key, mode, s3_deleted)
+
+    return {
+        "ok": True,
+        "challenge_id": str(challenge_id),
+        "s3_key": s3_key,
+        "deleted_from_s3": s3_deleted,
+        "deletion_mode": mode,
+        "message": "Challenge image removed from dataset.",
+    }
+
+
+@router.delete("")
+def bulk_delete_challenges(
+    scope: str = Query("cooldown", pattern="^(cooldown|all)$"),
+    theme: Optional[str] = Query(None),
+    exclude_theme: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    s3_service: S3Service = Depends(get_s3_service),
+) -> Dict[str, Any]:
+    """Bulk-remove challenge images from the dataset (e.g., all 24h cooldown or mismatched-theme images).
+
+    - scope='cooldown': removes all active images currently in 24-hour cooldown.
+    - scope='all': removes all active images matching optional theme filters.
+    - theme: if provided, only deletes images with this exact theme (e.g., 'general').
+    - exclude_theme: if provided, only deletes images whose theme does NOT match this theme.
+    """
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=24)
 
-    items = db.query(Challenge).order_by(Challenge.created_at.desc()).limit(limit).all()
+    items = db.query(Challenge).filter(Challenge.is_active.is_(True)).all()
+
+    target_theme = theme.strip().lower() if theme and theme.strip() else None
+    keep_theme = exclude_theme.strip().lower() if exclude_theme and exclude_theme.strip() else None
+
+    to_delete: List[Challenge] = []
+    for c in items:
+        if scope == "cooldown" and _is_eligible_for_reuse(c, cutoff):
+            continue
+        c_theme = (c.theme or "").strip().lower()
+        if target_theme and c_theme != target_theme:
+            continue
+        if keep_theme and c_theme == keep_theme:
+            continue
+        to_delete.append(c)
+
+    deleted_ids: List[str] = []
+    s3_deleted_count = 0
+    for c in to_delete:
+        cid = str(c.id)
+        s3_ok, _ = _remove_challenge(c, db, s3_service)
+        deleted_ids.append(cid)
+        if s3_ok:
+            s3_deleted_count += 1
+
+    logger.info(
+        "Bulk removed %d challenges (scope=%s, theme=%s, exclude_theme=%s, s3_deleted=%d)",
+        len(deleted_ids),
+        scope,
+        target_theme,
+        keep_theme,
+        s3_deleted_count,
+    )
+
+    return {
+        "ok": True,
+        "scope": scope,
+        "deleted_count": len(deleted_ids),
+        "s3_deleted_count": s3_deleted_count,
+        "deleted_ids": deleted_ids,
+        "message": f"Removed {len(deleted_ids)} challenge image(s) from dataset.",
+    }
+
+
+@router.get("")
+def list_challenges(
+    limit: int = Query(50, ge=1, le=200),
+    theme: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List active stored challenges and their 24-hour reuse eligibility status."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=24)
+
+    query = db.query(Challenge).filter(Challenge.is_active.is_(True))
+    if theme and theme.strip():
+        query = query.filter(func.lower(Challenge.theme) == theme.strip().lower())
+
+    items = query.order_by(Challenge.created_at.desc()).limit(limit).all()
 
     result = []
     for c in items:
         hours_old = max(0.0, (now - c.created_at).total_seconds() / 3600.0)
-        
+
         last_used_str = None
         last_used_dt = None
         if c.metadata_json and isinstance(c.metadata_json, dict):
@@ -343,6 +471,7 @@ def list_challenges(
             {
                 "id": str(c.id),
                 "title": c.title,
+                "theme": c.theme,
                 "difficulty": c.difficulty,
                 "s3_key": c.reference_image_s3_key,
                 "created_at": c.created_at.isoformat(),

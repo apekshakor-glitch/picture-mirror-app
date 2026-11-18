@@ -154,6 +154,19 @@ class S3Service:
             logger.error("Failed to generate presigned download URL: %s", type(exc).__name__)
             raise
 
+    def delete_object(self, object_key: str) -> bool:
+        """Delete an object from the private S3 bucket. Returns True if deleted, False on error."""
+        try:
+            self.client.delete_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+            )
+            logger.info("Deleted s3://%s/%s", self.bucket_name, object_key)
+            return True
+        except Exception as exc:
+            logger.warning("Failed to delete s3://%s/%s: %s", self.bucket_name, object_key, exc)
+            return False
+
 
 @lru_cache
 def get_s3_service() -> S3Service:
