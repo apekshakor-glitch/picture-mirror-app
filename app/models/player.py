@@ -121,12 +121,39 @@ class Player(Base, TimestampMixin):
             for stat in self.game_stats:
                 g = stat.game or "prompt-mirror"
                 if g not in games_dict:
-                    games_dict[g] = {"solo": {"roundsPlayed": 0, "highScores": {}}}
-                games_dict[g]["solo"]["roundsPlayed"] = max(
-                    games_dict[g]["solo"]["roundsPlayed"],
-                    stat.rounds_played,
-                )
-                games_dict[g]["solo"]["highScores"][str(stat.level)] = stat.high_score
+                    games_dict[g] = {
+                        "solo": {
+                            "played": 0,
+                            "roundsPlayed": 0,
+                            "bestScore": 0,
+                            "totalScore": 0,
+                            "byLevel": {},
+                            "highScores": {},
+                        },
+                        "tournament": {
+                            "tournamentsPlayed": 0,
+                            "tournamentsWon": 0,
+                            "matchesPlayed": 0,
+                            "matchesWon": 0,
+                            "bestRoundLabel": "",
+                            "totalMatchScore": 0,
+                            "byLevel": {},
+                        },
+                    }
+                lvl_key = str(stat.level)
+                rounds = int(stat.rounds_played or 0)
+                best = int(stat.high_score or 0)
+                solo = games_dict[g]["solo"]
+                solo["played"] += rounds
+                solo["roundsPlayed"] = max(solo["roundsPlayed"], rounds)
+                solo["bestScore"] = max(solo["bestScore"], best)
+                solo["totalScore"] += best * rounds
+                solo["highScores"][lvl_key] = best
+                solo["byLevel"][lvl_key] = {
+                    "played": rounds,
+                    "bestScore": best,
+                    "totalScore": best * rounds,
+                }
 
         return {
             "id": self.id,

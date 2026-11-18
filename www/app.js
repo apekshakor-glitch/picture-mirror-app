@@ -1690,6 +1690,8 @@ async function findExistingPlayerByNameOrId(nameOrId) {
 
     const res = await fetch("/api/players");
 
+    if (!res.ok) throw new Error("HTTP " + res.status);
+
     const data = await res.json();
 
     const key = trimmed.toLowerCase();
@@ -3505,7 +3507,9 @@ async function renderPlayerProfiles() {
 
   } catch (e) {
 
-    wrap.innerHTML = '<p class="error">Could not load player profiles.</p>';
+    console.error("[DaRI Arcade] Could not load player profiles:", e);
+
+    wrap.innerHTML = '<p class="error">Could not load player profiles (' + escapeHtml(e && e.message ? e.message : 'network error') + ').</p>';
 
   }
 
