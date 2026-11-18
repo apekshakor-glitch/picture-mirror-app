@@ -20,7 +20,7 @@ const GOOGLE_CLIENT_ID_OVERRIDE = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercon
 
 
 
-const IMAGE_MODEL = "dall-e-3";
+const IMAGE_MODEL = "gpt-image-1-mini";
 
 const SCORE_MODEL = "gpt-4o-mini";
 
@@ -2399,11 +2399,12 @@ function goToCreateTournament() {
 // API version, so we handle both rather than assuming one.
 
 function imgSrc(img) {
-
   if (!img) return "";
-
-  return img.kind === "b64" ? "data:image/png;base64," + img.value : img.value;
-
+  if (img.kind === "b64") {
+    const val = String(img.value || "").trim();
+    return val.startsWith("data:") ? val : ("data:image/png;base64," + val);
+  }
+  return img.value;
 }
 
 
@@ -4032,130 +4033,55 @@ async function generateImage(prompt) {
 
 
 
-  // Tier 1: Try OpenAI DALL-E 3
-
+  // Tier 1 & 2: OpenAI GPT Image Models (gpt-image-1-mini -> gpt-image-1.5 -> chatgpt-image-latest)
   if (state.apiKey) {
+    const openAiModels = [IMAGE_MODEL, "gpt-image-1.5", "chatgpt-image-latest"];
+    for (const modelName of openAiModels) {
+      try {
+        console.log(`[DaRI Arcade] Generating AI image via OpenAI (${modelName}) for:`, cleanPrompt);
+        const res = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + state.apiKey,
+          },
+          body: JSON.stringify({
+            model: modelName,
+            prompt: cleanPrompt,
+            size: IMAGE_SIZE,
+            quality: "low",
+            output_format: "jpeg",
+            n: 1,
+          }),
+        });
 
-    try {
-
-      const res = await fetch("https://api.openai.com/v1/images/generations", {
-
-        method: "POST",
-
-        headers: {
-
-          "Content-Type": "application/json",
-
-          "Authorization": "Bearer " + state.apiKey,
-
-        },
-
-        body: JSON.stringify({
-
-          model: "dall-e-3",
-
-          prompt: cleanPrompt,
-
-          size: "1024x1024",
-
-          n: 1,
-
-        }),
-
-      });
-
-
-
-      if (res.ok) {
-
-        const data = await res.json();
-
-        const item = data.data && data.data[0];
-
-        if (item) {
-
-          if (item.b64_json) return { kind: "b64", value: item.b64_json };
-
-          if (item.url) return { kind: "url", value: item.url };
-
-        }
-
-      } else {
-
-        const errBody = await res.json().catch(() => ({}));
-
-        const errMsg = (errBody.error && errBody.error.message) || "";
-
-        console.warn("[DaRI Arcade] DALL-E-3 error:", errMsg);
-
-
-
-        // Tier 2: Try OpenAI DALL-E 2 if DALL-E 3 doesn't exist
-
-        if (/does not exist|invalid_value|model|permission/i.test(errMsg)) {
-
-          console.log("[DaRI Arcade] Attempting DALL-E 2 fallback...");
-
-          try {
-
-            const res2 = await fetch("https://api.openai.com/v1/images/generations", {
-
-              method: "POST",
-
-              headers: {
-
-                "Content-Type": "application/json",
-
-                "Authorization": "Bearer " + state.apiKey,
-
-              },
-
-              body: JSON.stringify({
-
-                model: "dall-e-2",
-
-                prompt: cleanPrompt.slice(0, 1000),
-
-                size: "1024x1024",
-
-                n: 1,
-
-              }),
-
-            });
-
-            if (res2.ok) {
-
-              const data2 = await res2.json();
-
-              const item2 = data2.data && data2.data[0];
-
-              if (item2) {
-
-                if (item2.b64_json) return { kind: "b64", value: item2.b64_json };
-
-                if (item2.url) return { kind: "url", value: item2.url };
-
-              }
-
+        if (res.ok) {
+          const data = await res.json();
+          const item = data.data && data.data[0];
+          if (item) {
+            if (item.b64_json) {
+              console.log(`[DaRI Arcade] OpenAI (${modelName}) image generated successfully!`);
+              return { kind: "b64", value: "data:image/jpeg;base64," + item.b64_json };
             }
-
-          } catch (e2) {
-
-            console.warn("[DaRI Arcade] DALL-E 2 exception:", e2.message);
-
+            if (item.url) {
+              console.log(`[DaRI Arcade] OpenAI (${modelName}) image URL generated successfully!`);
+              return { kind: "url", value: item.url };
+            }
           }
-
+        } else {
+          const errBody = await res.json().catch(() => ({}));
+          const errMsg = (errBody.error && errBody.error.message) || ("HTTP " + res.status);
+          console.warn(`[DaRI Arcade] OpenAI ${modelName} error:`, errMsg);
+          // Only try the next model if this model does not exist / invalid_value / unavailable
+          if (!/does not exist|invalid_value|model|permission|not_found/i.test(errMsg)) {
+            break;
+          }
         }
-
+      } catch (e) {
+        console.warn(`[DaRI Arcade] OpenAI ${modelName} fetch exception:`, e.message);
+        break;
       }
-
-    } catch (e) {
-
-      console.warn("[DaRI Arcade] OpenAI fetch exception:", e.message);
-
     }
-
   }
 
 
