@@ -1,0 +1,37 @@
+# Git
+.git/
+.gitignore
+
+# Environment files and credentials (CRITICAL: Never build secrets into Docker image)
+.env
+.env.*
+*.pem
+*.key
+aws_credentials
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Testing and coverage
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE / Editor artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary & documentation
+README.md
+*.log
