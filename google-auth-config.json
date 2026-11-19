@@ -1,0 +1,4 @@
+{
+  "client_id": "184733001604-c96ukbmgkegk3gt38egun0i1avo5lgpd.apps.googleusercontent.com",
+  "_instructions": "Store your GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env (loaded automatically by server.js)."
+}
