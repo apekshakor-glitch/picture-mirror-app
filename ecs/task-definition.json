@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "dariai-picture-mirror-api",
-      "image": "<AWS_ACCOUNT_ID>.dkr.ecr.ap-south-2.amazonaws.com/dariai-picture-mirror:latest",
+      "image": "568199007541.dkr.ecr.ap-south-2.amazonaws.com/dariai-picture-mirror:latest",
       "essential": true,
       "portMappings": [
         {
