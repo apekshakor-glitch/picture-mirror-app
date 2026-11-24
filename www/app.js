@@ -1331,7 +1331,11 @@ function initGoogleAuth() {
 
 function setupGoogleGIS(clientId) {
 
-  if (window.google && google.accounts && google.accounts.id && clientId && !clientId.includes("YOUR_GOOGLE_CLIENT_ID_HERE")) {
+  if (!clientId || clientId.includes("YOUR_GOOGLE_CLIENT_ID_HERE")) return;
+
+  function doInit() {
+
+    if (!window.google || !google.accounts || !google.accounts.id) return false;
 
     try {
 
@@ -1346,10 +1350,6 @@ function setupGoogleGIS(clientId) {
         cancel_on_tap_outside: true,
 
       });
-
-
-
-      // Render official Google Sign-In button
 
       const container = el("google-gsi-container");
 
@@ -1375,19 +1375,39 @@ function setupGoogleGIS(clientId) {
 
         container.style.display = "flex";
 
-        // Hide fallback button once official button is rendered
-
         const fallbackBtn = el("btn-google-signin");
 
         if (fallbackBtn) fallbackBtn.style.display = "none";
 
       }
 
+      return true;
+
     } catch (e) {
 
-      console.warn("GIS initialization warning:", e);
+      console.warn("Google GIS initialization error:", e);
+
+      return false;
 
     }
+
+  }
+
+  if (!doInit()) {
+
+    let attempts = 0;
+
+    const timer = setInterval(() => {
+
+      attempts++;
+
+      if (doInit() || attempts > 25) {
+
+        clearInterval(timer);
+
+      }
+
+    }, 200);
 
   }
 
@@ -1413,11 +1433,25 @@ function handleGoogleButtonClick() {
 
       });
 
+      setTimeout(() => {
+
+        const sim = el("modal-google-simulator");
+
+        const gsiRendered = el("google-gsi-container") && el("google-gsi-container").children.length > 0;
+
+        if (!gsiRendered && sim && sim.hidden) {
+
+          sim.hidden = false;
+
+        }
+
+      }, 800);
+
       return;
 
     } catch (e) {
 
-      console.warn("Google prompt error:", e);
+      console.warn("Google prompt error, opening email fallback:", e);
 
     }
 
@@ -1601,7 +1635,7 @@ async function finishGoogleSignup() {
 
     const data = await res.json();
 
-    if (!data.ok) throw new Error(data.error || "Could not save profile.");
+    if (!data.ok) throw new Error(data.error || data.detail || "Could not save profile.");
 
 
 

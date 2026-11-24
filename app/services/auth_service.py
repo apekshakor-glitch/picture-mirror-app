@@ -130,11 +130,18 @@ def register_player(
     # Check duplicate
     existing = get_player_by_email(db, clean_email)
     if existing:
+        if google_id and not existing.google_id:
+            existing.google_id = google_id
+        if avatar_url and not existing.avatar_url:
+            existing.avatar_url = avatar_url
+        existing.last_active_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(existing)
         return {
-            "ok": False,
-            "error": "An account with this email already exists.",
+            "ok": True,
             "is_new": False,
             "player": existing.to_dict(),
+            "message": f"Welcome back, {existing.name}!",
         }
 
     valid_role = "admin" if role == "admin" else "participant"

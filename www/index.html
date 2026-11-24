@@ -92,24 +92,45 @@
         </div>
       </div>
 
-      <!-- Hidden legacy compatibility fields so external scripts won't break -->
-      <div style="display:none;" aria-hidden="true">
-        <input id="input-identity-search" type="text">
-        <button id="btn-identity-continue" type="button"></button>
-        <p id="identity-notice"></p>
-        <p id="identity-error"></p>
-        <div id="identity-takeover-block">
-          <button id="btn-identity-takeover" type="button"></button>
+      <!-- Direct Sign-In Alternative -->
+      <div class="auth-divider">
+        <span>OR SIGN IN DIRECTLY</span>
+      </div>
+
+      <div class="direct-auth-section" id="direct-auth-section">
+        <label for="input-identity-search" style="font-size:0.9rem;font-weight:600;margin-bottom:6px;display:block;">Player Name, Email, or Player ID</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input id="input-identity-search" list="player-name-list" type="text" placeholder="e.g. Apekshakor, name@gmail.com, or P9752" style="flex:1;" autocomplete="username">
+          <button id="btn-identity-continue" class="btn-primary" type="button" style="white-space:nowrap;">Continue &rarr;</button>
         </div>
-        <input id="input-identity-new-name" type="text">
-        <div id="identity-role-picker">
-          <button type="button" class="level-btn active" data-role="participant"></button>
-          <button type="button" class="level-btn" data-role="admin"></button>
+        <p id="identity-notice" class="hint" hidden></p>
+        <p id="identity-error" class="error" hidden></p>
+        <div id="identity-takeover-block" hidden style="margin-bottom:8px;">
+          <button id="btn-identity-takeover" class="btn-secondary btn-block" type="button">Take over session</button>
         </div>
-        <button id="btn-identity-create" type="button"></button>
-        <p id="identity-create-error"></p>
-        <input id="input-login-email" type="text">
-        <button id="btn-login-submit" type="button"></button>
+
+        <div id="identity-new-profile-block" style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">
+          <details style="cursor:pointer;">
+            <summary style="font-size:0.85rem;color:var(--muted);font-weight:600;">Need a new player profile? Click to register</summary>
+            <div style="margin-top:10px;">
+              <label for="input-identity-new-name" style="font-size:0.85rem;display:block;margin-bottom:4px;">New Player Name</label>
+              <input id="input-identity-new-name" type="text" placeholder="Choose a display name" style="width:100%;margin-bottom:8px;">
+              <label style="font-size:0.85rem;display:block;margin-bottom:4px;">Role</label>
+              <div id="identity-role-picker" class="level-picker" style="margin-bottom:10px;">
+                <button type="button" class="level-btn active" data-role="participant">Participant</button>
+                <button type="button" class="level-btn" data-role="admin">Admin</button>
+              </div>
+              <button id="btn-identity-create" class="btn-secondary btn-block" type="button">Create Profile &amp; Play</button>
+              <p id="identity-create-error" class="error" hidden></p>
+            </div>
+          </details>
+        </div>
+
+        <!-- Hidden email login hook for backward compatibility -->
+        <div style="display:none;" aria-hidden="true">
+          <input id="input-login-email" type="text">
+          <button id="btn-login-submit" type="button"></button>
+        </div>
       </div>
     </div>
   </section>
