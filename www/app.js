@@ -1233,9 +1233,41 @@ function initGoogleAuth() {
 
   const handleCustomGoogleSubmit = () => {
 
-    // Direct user to real Google OAuth authentication
+    let raw = (el("input-google-sim-email").value || "").trim();
 
-    window.location.href = "/auth/google";
+    if (!raw) {
+
+      alert("Please enter your Google email address.");
+
+      return;
+
+    }
+
+    let email = raw;
+
+    if (!email.includes("@")) {
+
+      email = email.toLowerCase().replace(/[^a-z0-9.]/g, "") + "@gmail.com";
+
+    }
+
+    const username = email.split("@")[0].replace(/[._-]/g, " ");
+
+    const formattedName = username.replace(/\b\w/g, (l) => l.toUpperCase());
+
+    processGoogleUser({
+
+      name: formattedName,
+
+      email: email.toLowerCase(),
+
+      sub: "google-" + Math.abs(email.split("").reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0)),
+
+      picture: ""
+
+    });
+
+    el("modal-google-simulator").hidden = true;
 
   };
 
@@ -1373,7 +1405,9 @@ function handleGoogleButtonClick() {
 
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
 
-          window.location.href = "/auth/google";
+          const sim = el("modal-google-simulator");
+
+          if (sim) sim.hidden = false;
 
         }
 
@@ -1383,15 +1417,15 @@ function handleGoogleButtonClick() {
 
     } catch (e) {
 
-      console.warn("Google prompt error, redirecting:", e);
+      console.warn("Google prompt error:", e);
 
     }
 
   }
 
-  // Redirect to official Google OAuth flow
+  const sim = el("modal-google-simulator");
 
-  window.location.href = "/auth/google";
+  if (sim) sim.hidden = false;
 
 }
 

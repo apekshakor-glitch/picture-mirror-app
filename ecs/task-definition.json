@@ -28,7 +28,8 @@
         { "name": "DB_NAME", "value": "postgres" },
         { "name": "DB_USER", "value": "postgres" },
         { "name": "AWS_REGION", "value": "ap-south-2" },
-        { "name": "S3_BUCKET_NAME", "value": "dari-ai-picture-mirror-dev" }
+        { "name": "S3_BUCKET_NAME", "value": "dari-ai-picture-mirror-dev" },
+        { "name": "GOOGLE_CLIENT_ID", "value": "184733001604-c96ukbmgkegk3gt38egun0i1avo5lgpd.apps.googleusercontent.com" }
       ],
       "secrets": [
         {

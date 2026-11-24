@@ -103,6 +103,12 @@ def create_application() -> FastAPI:
     app.include_router(players_router)
     app.include_router(tournaments_router)
 
+    @app.get("/auth/google")
+    def auth_google_redirect():
+        """Graceful redirect for OAuth flows back to the application root."""
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/", status_code=302)
+
     # Mount static files for the Arcade Web App
     # Resolves www relative to project root
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
