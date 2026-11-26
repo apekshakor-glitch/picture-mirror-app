@@ -1601,9 +1601,8 @@ async function finishGoogleSignup() {
 
   if (!authState.pendingGoogleUser) return;
 
-  const roleBtn = document.querySelector("#google-role-picker .level-btn.active");
-
-  const role = (roleBtn && roleBtn.dataset.role) || "participant";
+  // All new Google signups start strictly as participant; admin role can only be assigned via DB or an existing admin
+  const role = "participant";
 
 
 
@@ -1889,9 +1888,8 @@ async function createIdentity() {
 
   }
 
-  const roleBtn = document.querySelector("#identity-role-picker .level-btn.active");
-
-  const role = (roleBtn && roleBtn.dataset.role) || "participant";
+  // All self-created profiles start strictly as participant; admin role can only be assigned via DB or an existing admin
+  const role = "participant";
 
   try {
 
@@ -3447,6 +3445,10 @@ function buildProfileCard(p, rankings) {
   const games = p.games || {};
 
   const isAdmin = p.role === "admin";
+  const isViewerAdmin = identity.role === "admin";
+  const roleToggleHtml = isViewerAdmin
+    ? `<button type="button" class="link-btn profile-role-toggle-btn" title="Change this player's role">${isAdmin ? "Make participant" : "Make admin"}</button>`
+    : "";
 
   card.innerHTML =
 
@@ -3466,7 +3468,7 @@ function buildProfileCard(p, rankings) {
 
       `<div class="profile-card-actions">` +
 
-        `<button type="button" class="link-btn profile-role-toggle-btn" title="Change this player's role">${isAdmin ? "Make participant" : "Make admin"}</button>` +
+        roleToggleHtml +
 
         `<button type="button" class="link-btn profile-delete-btn" title="Delete this profile">Delete</button>` +
 
@@ -3484,7 +3486,10 @@ function buildProfileCard(p, rankings) {
 
   card.querySelector(".profile-delete-btn").addEventListener("click", () => deletePlayerProfile(p.id, p.name));
 
-  card.querySelector(".profile-role-toggle-btn").addEventListener("click", () => toggleProfileRole(p.id, isAdmin ? "participant" : "admin"));
+  const roleToggleBtn = card.querySelector(".profile-role-toggle-btn");
+  if (roleToggleBtn) {
+    roleToggleBtn.addEventListener("click", () => toggleProfileRole(p.id, isAdmin ? "participant" : "admin"));
+  }
 
   return card;
 
@@ -3492,19 +3497,13 @@ function buildProfileCard(p, rankings) {
 
 
 
-// Since role is self-declared (this app has no passwords), anyone can flip
-
-// anyone's role here - same trust model as picking your own role when
-
-// creating a profile. This mainly exists so someone whose profile got
-
-// auto-created before they ever used the identity screen (e.g. an admin
-
-// typed their name into a tournament roster first) isn't permanently stuck
-
-// as a participant with no way to become an admin.
-
+// Only an existing admin can promote or demote other players.
 async function toggleProfileRole(id, newRole) {
+
+  if (identity.role !== "admin") {
+    window.alert("Permission denied: Only an admin can change player roles.");
+    return;
+  }
 
   try {
 
@@ -3514,13 +3513,13 @@ async function toggleProfileRole(id, newRole) {
 
       headers: { "Content-Type": "application/json" },
 
-      body: JSON.stringify({ playerId: id, role: newRole }),
+      body: JSON.stringify({ playerId: id, role: newRole, adminPlayerId: identity.id }),
 
     });
 
     const data = await res.json();
 
-    if (!data.ok) throw new Error(data.error || "Could not update role.");
+    if (!res.ok || !data.ok) throw new Error(data.detail || data.error || "Could not update role.");
 
     if (identity.id === id) {
 

@@ -229,18 +229,18 @@ def check_email(payload: CheckEmailRequest, db: Session = Depends(get_db)):
 @router.post("/auth/signup")
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     """
-    Registers a new player with specific role ('admin' | 'participant').
-    If role is 'admin', securely stores the OpenAI API Key in the database.
+    Registers a new player profile (strictly as participant).
+    Admins can only be created via database or converted by another admin.
     """
     result = register_player(
         db=db,
         name=payload.name,
         email=payload.email,
-        role=payload.role,
+        role="participant",  # Enforce participant role on self-registration
         google_id=payload.googleId,
         avatar_url=payload.avatar,
         device_token=payload.deviceToken,
-        openai_api_key=payload.openai_api_key,
+        openai_api_key=None,
     )
     if not result.get("ok"):
         raise HTTPException(

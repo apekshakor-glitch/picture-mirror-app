@@ -393,17 +393,18 @@
     }
 
     if (url === "/api/players/role" && method === "POST") {
-      const pid = (body.id || "").trim().toUpperCase();
-      const role = body.role === "admin" ? "admin" : "participant";
-      if (role === "admin" && body.password !== "1234") {
-        return createJsonResponse({ ok: false, error: "Incorrect admin password." }, 403);
-      }
+      const adminId = (body.adminPlayerId || body.admin_player_id || "").trim().toUpperCase();
       const data = getLocalPlayers();
-      const p = data.players[pid];
-      if (p) {
-        p.role = role;
+      const admin = data.players[adminId];
+      if (!admin || admin.role !== "admin") {
+        return createJsonResponse({ ok: false, error: "Permission denied: Only an admin can change player roles." }, 403);
+      }
+      const pid = (body.playerId || body.id || "").trim().toUpperCase();
+      const role = (body.role || "participant").trim().toLowerCase() === "admin" ? "admin" : "participant";
+      if (data.players[pid]) {
+        data.players[pid].role = role;
         saveLocalPlayers(data);
-        return createJsonResponse({ ok: true, player: p });
+        return createJsonResponse({ ok: true, player: data.players[pid] });
       }
       return createJsonResponse({ ok: false, error: "Player not found." }, 404);
     }
@@ -420,17 +421,7 @@
       return createJsonResponse({ ok: true });
     }
 
-    if (url === "/api/players/role" && method === "POST") {
-      const pid = (body.playerId || "").trim().toUpperCase();
-      const role = (body.role || "participant").trim().toLowerCase();
-      const data = getLocalPlayers();
-      if (data.players[pid]) {
-        data.players[pid].role = role;
-        saveLocalPlayers(data);
-        return createJsonResponse({ ok: true, player: data.players[pid] });
-      }
-      return createJsonResponse({ ok: false, error: "Player not found" }, 404);
-    }
+
 
     if (url === "/api/players/event" && method === "POST") {
       const pid = (body.playerId || "").trim().toUpperCase();

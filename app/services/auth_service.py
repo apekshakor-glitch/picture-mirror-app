@@ -144,7 +144,9 @@ def register_player(
             "message": f"Welcome back, {existing.name}!",
         }
 
-    valid_role = "admin" if role == "admin" else "participant"
+    # All newly registered players start strictly as participants.
+    # Admins can only be created directly in DB or converted by another admin.
+    valid_role = "participant"
 
     new_player = Player(
         id=generate_player_id(),

@@ -115,11 +115,7 @@
             <div style="margin-top:10px;">
               <label for="input-identity-new-name" style="font-size:0.85rem;display:block;margin-bottom:4px;">New Player Name</label>
               <input id="input-identity-new-name" type="text" placeholder="Choose a display name" style="width:100%;margin-bottom:8px;">
-              <label style="font-size:0.85rem;display:block;margin-bottom:4px;">Role</label>
-              <div id="identity-role-picker" class="level-picker" style="margin-bottom:10px;">
-                <button type="button" class="level-btn active" data-role="participant">Participant</button>
-                <button type="button" class="level-btn" data-role="admin">Admin</button>
-              </div>
+              <p class="muted" style="font-size:0.75rem;margin:0 0 10px 0;">New profiles register as Dari Participant. (Admin privileges are granted by an existing admin or database).</p>
               <button id="btn-identity-create" class="btn-secondary btn-block" type="button">Create Profile &amp; Play</button>
               <p id="identity-create-error" class="error" hidden></p>
             </div>
@@ -141,7 +137,7 @@
       <div class="auth-modal-header">
         <span class="google-badge-pill">Google Sign-In</span>
         <h2>Welcome to DaRI AI Arcade!</h2>
-        <p class="muted">You're signing in with Google for the first time. Confirm your role to complete setup:</p>
+        <p class="muted">You're signing in with Google for the first time. Complete setup to enter the arcade:</p>
       </div>
 
       <div class="google-user-summary">
@@ -155,16 +151,8 @@
         </div>
       </div>
 
-      <label>Select Your DaRI Role</label>
-      <div class="level-picker" id="google-role-picker">
-        <button type="button" class="level-btn active" data-role="participant">
-          <span class="level-num">Dari Participant</span>
-          <span class="level-tag">Play solo challenges &amp; join tournaments</span>
-        </button>
-        <button type="button" class="level-btn" data-role="admin">
-          <span class="level-num">Dari Admin</span>
-          <span class="level-tag">Can also host &amp; manage tournaments</span>
-        </button>
+      <div class="google-onboard-role-note" style="margin: 14px 0 16px 0; padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.85rem; color: var(--muted);">
+        <span>Role: </span><strong style="color:var(--text,#fff);">Dari Participant</strong> &mdash; Play solo challenges &amp; join tournaments. (Admin privileges are granted by an existing admin).
       </div>
 
       <button id="btn-google-complete-signup" class="btn-primary btn-block" type="button">Confirm &amp; Enter Arcade</button>

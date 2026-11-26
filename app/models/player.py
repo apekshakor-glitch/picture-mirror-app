@@ -117,8 +117,10 @@ class Player(Base, TimestampMixin):
     def to_dict(self) -> dict:
         """Returns player dictionary matching frontend expected JSON schema."""
         games_dict = {}
-        if hasattr(self, "game_stats") and self.game_stats:
-            for stat in self.game_stats:
+        # Safely inspect loaded attributes to avoid unintended lazy database queries
+        stats = self.__dict__.get("game_stats")
+        if stats:
+            for stat in stats:
                 g = stat.game or "prompt-mirror"
                 if g not in games_dict:
                     games_dict[g] = {

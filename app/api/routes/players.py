@@ -56,6 +56,8 @@ class PlayerRoleRequest(BaseModel):
     playerId: Optional[str] = None
     id: Optional[str] = None
     role: str = "participant"
+    adminPlayerId: Optional[str] = None
+    admin_player_id: Optional[str] = None
 
 
 class PlayerDeleteRequest(BaseModel):
@@ -179,7 +181,8 @@ def create_player(payload: PlayerCreateRequest, db: Session = Depends(get_db)):
     if not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required.")
 
-    valid_role = "admin" if payload.role == "admin" else "participant"
+    # Self-created players can only be participants; admin role can only be granted in DB or by an existing admin
+    valid_role = "participant"
     email = payload.email.strip().lower() if payload.email else f"{name.lower().replace(' ', '.')}@dari.ai"
 
     # Ensure unique email if collision
@@ -251,9 +254,38 @@ def record_event(payload: PlayerEventRequest, db: Session = Depends(get_db)):
 
 @router.post("/role")
 def update_role(payload: PlayerRoleRequest, db: Session = Depends(get_db)):
-    """Toggles player role between 'admin' and 'participant'."""
+    """Toggles player role between 'admin' and 'participant'.
+
+    SECURITY: Only an authenticated existing admin can change player roles.
+    """
+    admin_id = (payload.adminPlayerId or payload.admin_player_id or "").strip()
+    if not admin_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: An admin ID is required to modify player roles.",
+        )
+
+    admin = db.get(Player, admin_id)
+    if not admin:
+        admin = db.query(Player).filter(Player.id.ilike(admin_id)).first()
+
+    if not admin or admin.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: Only an existing admin can change player roles.",
+        )
+
     pid = (payload.playerId or payload.id or "").strip()
+    if not pid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Target player ID is required.",
+        )
+
     p = db.get(Player, pid)
+    if not p:
+        p = db.query(Player).filter(Player.id.ilike(pid)).first()
+
     if not p:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Player not found.")
 
